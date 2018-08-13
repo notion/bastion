@@ -80,12 +80,16 @@ func startServer(addr string, env *config.Env) {
 			continue
 		}
 
+		env.SshServerClients[sshConn.RemoteAddr()] = &config.SshServerClient{
+			Client: sshConn,
+		}
+
 		color.Set(color.FgGreen)
 		log.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), sshConn.ClientVersion())
 		color.Unset()
 
 		go ssh.DiscardRequests(reqs)
-		go handleChannels(chans)
+		go handleChannels(chans, sshConn, env)
 	}
 }
 
@@ -115,13 +119,13 @@ func createPrivateKey(env *config.Env) []byte {
 	return bytes
 }
 
-func handleChannels(chans <-chan ssh.NewChannel) {
+func handleChannels(chans <-chan ssh.NewChannel, sshConn *ssh.ServerConn, env *config.Env) {
 	for newChannel := range chans {
-		go handleChannel(newChannel)
+		go handleChannel(newChannel, sshConn, env)
 	}
 }
 
-func handleChannel(newChannel ssh.NewChannel) {
+func handleChannel(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *config.Env) {
 	if t := newChannel.ChannelType(); t != "session" {
 		newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
 		return
@@ -145,6 +149,8 @@ func handleChannel(newChannel ssh.NewChannel) {
 		if err != nil {
 			log.Printf("Failed to exit bash (%s)", err)
 		}
+
+		delete(env.SshServerClients, sshConn.RemoteAddr())
 		log.Printf("Session closed")
 	}
 

@@ -7,6 +7,7 @@ import (
 	"log"
 	"golang.org/x/crypto/ssh"
 	"net/mail"
+	"net"
 )
 
 type Config struct {
@@ -22,18 +23,18 @@ type User struct {
 }
 
 type Env struct {
-	SshServerClients []SshServerClient
-	SshProxyClients []SshProxyClient
+	SshServerClients map[net.Addr]*SshServerClient
+	SshProxyClients map[net.Addr]*SshProxyClient
 	DB *gorm.DB
 	Config *Config
 }
 
 type SshServerClient struct {
-	Client ssh.ServerConn
+	Client *ssh.ServerConn
 }
 
 type SshProxyClient struct {
-	Client ssh.Client
+	Client *ssh.Client
 }
 
 func Load() *Env {
@@ -51,8 +52,8 @@ func Load() *Env {
 	db.First(&config)
 
 	return &Env{
-		SshServerClients: make([]SshServerClient, 0),
-		SshProxyClients: make([]SshProxyClient, 0),
+		SshServerClients: make(map[net.Addr]*SshServerClient, 0),
+		SshProxyClients: make(map[net.Addr]*SshProxyClient, 0),
 		Config: &config,
 		DB: db,
 	}
