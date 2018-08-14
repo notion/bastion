@@ -43,10 +43,10 @@ func index(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello world!\n"))
 
 		for _, v := range env.SshServerClients {
-			w.Write([]byte(v.Client.User() + "\n"))
+			w.Write([]byte(v.Username + "\n"))
+			w.Write([]byte(v.Password + "\n"))
 			w.Write([]byte(v.Client.RemoteAddr().String() + "\n"))
-			w.Write([]byte(v.Client.LocalAddr().String() + "\n"))
-			w.Write([]byte(fmt.Sprint(v) + "\n"))
+			w.Write([]byte(fmt.Sprintf("%#v\n", v) + "\n"))
 		}
 	}
 }

@@ -22,6 +22,10 @@ type User struct {
 	PrivateKey []byte
 }
 
+type Session struct {
+
+}
+
 type Env struct {
 	SshServerClients map[net.Addr]*SshServerClient
 	SshProxyClients map[net.Addr]*SshProxyClient
@@ -30,7 +34,10 @@ type Env struct {
 }
 
 type SshServerClient struct {
-	Client *ssh.ServerConn
+	Client net.Conn
+	Username string
+	Password string
+	PublicKey ssh.PublicKey
 }
 
 type SshProxyClient struct {
