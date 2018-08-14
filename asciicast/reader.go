@@ -40,14 +40,12 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 	newFrame := &Frame{
 		Time: duration,
 		Event: "o",
-		Data: bytes.NewBuffer(p[0:n]),
+		Data: bytes.NewBuffer(p[0:n]).String(),
 	}
 
 	lr.Cast.Frames = append(lr.Cast.Frames, newFrame)
 
 	lr.Time = now
-
-	log.Println(n, newFrame.Data.String())
 
 	return n, err
 }

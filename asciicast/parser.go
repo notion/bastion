@@ -1,7 +1,6 @@
 package asciicast
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
 	"strings"
@@ -28,7 +27,7 @@ type Header struct {
 type Frame struct {
 	Time float64
 	Event string
-	Data *bytes.Buffer
+	Data string
 }
 
 func (cast *Cast) Marshal() (string, error) {
@@ -46,9 +45,7 @@ func (cast *Cast) Marshal() (string, error) {
 
 		frameData[0] = frame.Time
 		frameData[1] = frame.Event
-		frameData[2] = frame.Data.String()
-
-		log.Println(frame.Data.String())
+		frameData[2] = frame.Data
 
 		frameJson, err := json.Marshal(frameData)
 		if err != nil {
@@ -85,14 +82,10 @@ func Unmarshal(data string) (*Cast, error) {
 			log.Println("Error unmarshaling header data")
 		}
 
-		frameDataBuffer := &bytes.Buffer{}
-
-		frameDataBuffer.Write([]byte(frameSlice[2].(string)))
-
 		frameStruct := &Frame{
 			Time: frameSlice[0].(float64),
 			Event: frameSlice[1].(string),
-			Data: frameDataBuffer,
+			Data: frameSlice[2].(string),
 		}
 
 		cast.Frames = append(cast.Frames, frameStruct)
