@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"net/mail"
 	"net"
+	"time"
 )
 
 type Config struct {
@@ -23,7 +24,10 @@ type User struct {
 }
 
 type Session struct {
-
+	gorm.Model
+	//User *User
+	Time time.Time
+	Cast string `gorm:"type:LONGTEXT;"`
 }
 
 type Env struct {
@@ -52,7 +56,7 @@ func Load() *Env {
 		color.Unset()
 	}
 
-	db.AutoMigrate(&Config{}, &User{})
+	db.AutoMigrate(&Config{}, &User{}, &Session{})
 
 	var config Config
 

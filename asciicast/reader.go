@@ -5,10 +5,10 @@ import (
 	"time"
 	"bytes"
 	"log"
-	"os"
+	"github.com/notion/trove_ssh_bastion/config"
 )
 
-func NewAsciicastReadCloser(r io.ReadCloser, width int, height int) io.ReadCloser {
+func NewAsciicastReadCloser(r io.ReadCloser, width int, height int, env *config.Env) io.ReadCloser {
 	return &AsciicastReadCloser{
 		ReadCloser: r,
 		Time: time.Now(),
@@ -20,6 +20,7 @@ func NewAsciicastReadCloser(r io.ReadCloser, width int, height int) io.ReadClose
 				Timestamp: time.Now().Unix(),
 			},
 		},
+		Env: env,
 	}
 }
 
@@ -29,6 +30,7 @@ type AsciicastReadCloser struct {
 	Cast   *Cast
 	Time   time.Time
 	Buffer bytes.Buffer
+	Env    *config.Env
 }
 
 func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
@@ -45,8 +47,6 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 
 	lr.Cast.Frames = append(lr.Cast.Frames, newFrame)
 
-	lr.Time = now
-
 	return n, err
 }
 
@@ -56,13 +56,20 @@ func (lr *AsciicastReadCloser) Close() error {
 		log.Println("Error logging session", err)
 	}
 
-	f, err := os.Create("trove_test.cast")
-	if err != nil {
-		log.Println("Error logging session", err)
+	//f, err := os.Create("trove_test.cast")
+	//if err != nil {
+	//	log.Println("Error logging session", err)
+	//}
+	//
+	//f.WriteString(data)
+	//f.Close()
+
+	session := &config.Session{
+		Time: lr.Time,
+		Cast: data,
 	}
 
-	f.WriteString(data)
-	f.Close()
+	lr.Env.DB.Save(session)
 
 	return lr.ReadCloser.Close()
 }
