@@ -6,9 +6,12 @@ import (
 	"log"
 	"github.com/gorilla/mux"
 	"github.com/notion/trove_ssh_bastion/config"
-	"fmt"
 	"encoding/json"
 	"html/template"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"context"
+	"fmt"
 )
 
 func logHTTP(handler http.Handler) http.Handler {
@@ -22,6 +25,16 @@ func logHTTP(handler http.Handler) http.Handler {
 }
 
 func Serve(addr string, env *config.Env) {
+	conf := oauth2.Config{
+		ClientID: "***REMOVED***",
+		ClientSecret: "***REMOVED***",
+		RedirectURL: "http://localhost:8080",
+		Scopes: []string{
+			"https://www.googleapis.com/auth/userinfo.email",
+		},
+		Endpoint: google.Endpoint,
+	}
+
 	r := mux.NewRouter()
 
 	templs, err := template.ParseGlob("web/templates/*")
@@ -29,7 +42,7 @@ func Serve(addr string, env *config.Env) {
 		log.Println("ERROR PARSING TEMPLATE GLOB:", err)
 	}
 
-	r.HandleFunc("/", index(env))
+	r.HandleFunc("/", index(env, conf))
 	r.HandleFunc("/sessions", sessionTempl(env, templs))
 	r.HandleFunc("/api/sessions", session(env))
 	r.HandleFunc("/api/sessions/{id}", sessionId(env))
@@ -48,15 +61,18 @@ func Serve(addr string, env *config.Env) {
 	color.Unset()
 }
 
-func index(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello world!\n"))
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			http.Redirect(w, r, conf.AuthCodeURL("state"), http.StatusFound)
+		} else {
+			token, err := conf.Exchange(context.TODO(), code)
+			if err != nil {
+				log.Println("ISSUE EXCHANGING CODE:", err)
+			}
 
-		for _, v := range env.SshServerClients {
-			w.Write([]byte(v.Username + "\n"))
-			w.Write([]byte(v.Password + "\n"))
-			w.Write([]byte(v.Client.RemoteAddr().String() + "\n"))
-			w.Write([]byte(fmt.Sprintf("%#v\n", v) + "\n"))
+			w.Write([]byte(fmt.Sprintf("%+v", token)))
 		}
 	}
 }
