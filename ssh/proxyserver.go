@@ -37,35 +37,10 @@ func startProxyServer(addr string, env *config.Env) {
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			fmt.Printf("Login attempt: %s, user %s password: %s", c.RemoteAddr(), c.User(), string(pass))
 
-			env.SshServerClients[c.RemoteAddr()].Username = c.User()
-			env.SshServerClients[c.RemoteAddr()].Password = string(pass)
-
-			clientConfig := &ssh.ClientConfig{
-				HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-					return nil
-				},
-				User: "root",
-			}
-
-			//clientConfig.User = c.User()
-			clientConfig.Auth = []ssh.AuthMethod{
-				ssh.Password(string(pass)),
-			}
-
-			client, err := ssh.Dial("tcp", "proc0.gce.us.nomail.net:22", clientConfig)
-			if err != nil {
-				log.Println("ERROR IN CALLBACKPW", err)
-				return nil, err
-			}
-
-			env.SshProxyClients[c.RemoteAddr()] = &config.SshProxyClient{
-				Client: client,
-			}
-
-			return nil, err
+			return nil, errors.New("Password login is disabled.")
 		},
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			fmt.Printf("Login attempt: %s, user %s password: %s", c.RemoteAddr(), c.User(), key)
+			fmt.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
 
 			env.SshServerClients[c.RemoteAddr()].Username = c.User()
 			env.SshServerClients[c.RemoteAddr()].PublicKey = key
