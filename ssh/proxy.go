@@ -5,6 +5,9 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io"
 	"log"
+	"strings"
+	"sync"
+	"github.com/notion/trove_ssh_bastion/config"
 )
 
 type SshConn struct {
@@ -13,6 +16,7 @@ type SshConn struct {
 	callbackFn func(c ssh.ConnMetadata) (*ssh.Client, error)
 	wrapFn     func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error)
 	closeFn    func(c ssh.ConnMetadata) error
+	env        *config.Env
 }
 
 func (p *SshConn) serve() error {
@@ -20,6 +24,50 @@ func (p *SshConn) serve() error {
 	if err != nil {
 		log.Println("failed to handshake")
 		return (err)
+	}
+
+	for chann := range chans {
+		if chann.ChannelType() == "session" {
+			connection, requests, err := chann.Accept()
+			if err != nil {
+				log.Println()
+			}
+
+			for req := range requests {
+				if req.Type == "subsystem" {
+					subsys := string(req.Payload[4:])
+
+					if strings.HasPrefix(subsys, "proxy:") {
+						log.Println("PROXYING")
+						req.Reply(true, nil)
+
+						host := strings.Replace(subsys, "proxy:", "", 1)
+
+						conn, err := net.Dial("tcp", host)
+						if err != nil {
+							log.Println(err)
+						}
+
+						closeConn := func() {
+							connection.Close()
+							log.Printf("Proxy Session closed")
+						}
+
+						wrapFn(p.env)(serverConn, )
+
+						var once sync.Once
+						go func() {
+							io.Copy(connection, conn)
+							once.Do(closeConn)
+						}()
+						go func() {
+							io.Copy(conn, connection)
+							once.Do(closeConn)
+						}()
+					}
+				}
+			}
+		}
 	}
 
 	defer serverConn.Close()

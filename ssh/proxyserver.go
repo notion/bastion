@@ -99,7 +99,7 @@ func startProxyServer(addr string, env *config.Env) {
 			continue
 		}
 
-		sshconn := &SshConn{Conn: tcpConn, config: sshConfig, callbackFn: callbackFn(env), wrapFn: wrapFn(env), closeFn: closeFn(env)}
+		sshconn := &SshConn{Conn: tcpConn, config: sshConfig, callbackFn: callbackFn(env), wrapFn: wrapFn(env), closeFn: closeFn(env), env: env}
 
 		env.SshServerClients[tcpConn.RemoteAddr()] = &config.SshServerClient{
 			Client: sshconn.Conn,
