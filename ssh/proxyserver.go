@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 	"github.com/notion/trove_ssh_bastion/asciicast"
-	"github.com/go-errors/errors"
+	"errors"
 )
 
 func startProxyServer(addr string, env *config.Env) {
@@ -37,7 +37,7 @@ func startProxyServer(addr string, env *config.Env) {
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			fmt.Printf("Login attempt: %s, user %s password: %s", c.RemoteAddr(), c.User(), string(pass))
 
-			return nil, errors.New("Password login is disabled.")
+			return nil, errors.New("password login is disabled")
 		},
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			fmt.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)

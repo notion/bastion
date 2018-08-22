@@ -11,9 +11,23 @@ import (
 	"github.com/fatih/color"
 	"net"
 	"github.com/notion/trove_ssh_bastion/config"
+	"strconv"
+	"strings"
 )
 
-var command = "bash"
+var (
+	//command = "ssh"
+	//args = []string{"proc0.gce.us.nomail.net"}
+	command = "bash"
+	args = make([]string, 0)
+)
+
+type forwardedTCPPayload struct {
+	Addr       string
+	Port       uint32
+	OriginAddr string
+	OriginPort uint32
+}
 
 func startServer(addr string, env *config.Env) {
 	sshConfig := &ssh.ServerConfig{
@@ -93,11 +107,56 @@ func handleChannels(chans <-chan ssh.NewChannel, sshConn *ssh.ServerConn, env *c
 }
 
 func handleChannel(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *config.Env) {
-	if t := newChannel.ChannelType(); t != "session" {
-		newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
+	switch channel := newChannel.ChannelType(); channel {
+	case "session":
+		handleSession(newChannel, sshConn, env)
+	case "direct-tcpip":
+		handleProxy(newChannel, sshConn, env)
+	default:
+		newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", channel))
+	}
+}
+
+func handleProxy(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *config.Env) {
+	connection, requests, err := newChannel.Accept()
+	if err != nil {
+		log.Printf("Could not accept channel (%s)", err)
 		return
 	}
 
+	closeConn := func() {
+		connection.Close()
+		log.Printf("Proxy Session closed")
+	}
+
+	go func() {
+		for req := range requests {
+			fmt.Println(req.Type, req.WantReply, string(req.Payload))
+		}
+	}()
+
+	var payload forwardedTCPPayload
+	if err = ssh.Unmarshal(newChannel.ExtraData(), &payload); err != nil {
+		log.Println(err)
+	}
+
+	conn, err := net.Dial("tcp", payload.Addr + ":" + strconv.FormatUint(uint64(payload.Port), 10))
+	if err != nil {
+		log.Println(err)
+	}
+
+	var once sync.Once
+	go func() {
+		io.Copy(connection, conn)
+		once.Do(closeConn)
+	}()
+	go func() {
+		io.Copy(conn, connection)
+		once.Do(closeConn)
+	}()
+}
+
+func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *config.Env) {
 	// At this point, we have the opportunity to reject the client's
 	// request for another logical connection
 	connection, requests, err := newChannel.Accept()
@@ -107,7 +166,7 @@ func handleChannel(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *conf
 	}
 
 	// Fire up bash for this session
-	bash := exec.Command(command)
+	bash := exec.Command(command, args...)
 
 	// Prepare teardown function
 	closeConn := func() {
@@ -130,17 +189,6 @@ func handleChannel(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *conf
 		return
 	}
 
-	//pipe session to bash and visa-versa
-	var once sync.Once
-	go func() {
-		io.Copy(connection, bashf)
-		once.Do(closeConn)
-	}()
-	go func() {
-		io.Copy(bashf, connection)
-		once.Do(closeConn)
-	}()
-
 	// Sessions have out-of-band requests such as "shell", "pty-req" and "env"
 	go func() {
 		for req := range requests {
@@ -150,6 +198,17 @@ func handleChannel(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *conf
 				// (i.e. no command in the Payload)
 				if len(req.Payload) == 0 {
 					req.Reply(true, nil)
+
+					//pipe session to bash and visa-versa
+					var once sync.Once
+					go func() {
+						io.Copy(connection, bashf)
+						once.Do(closeConn)
+					}()
+					go func() {
+						io.Copy(bashf, connection)
+						once.Do(closeConn)
+					}()
 				}
 			case "pty-req":
 				termLen := req.Payload[3]
@@ -161,6 +220,19 @@ func handleChannel(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *conf
 			case "window-change":
 				w, h := parseDims(req.Payload)
 				SetWinsize(bashf.Fd(), w, h)
+			case "subsystem":
+				subsys := string(req.Payload[4:])
+
+				if strings.HasPrefix(subsys, "proxy:") {
+					log.Println("PROXYING")
+					req.Reply(true, nil)
+
+					host := strings.Replace(subsys, "proxy:", "", 1)
+
+
+				}
+			default:
+				log.Println("UNKNOWN TYPE", req.Type)
 			}
 		}
 	}()
