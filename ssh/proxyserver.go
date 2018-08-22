@@ -37,37 +37,71 @@ func startProxyServer(addr string, env *config.Env) {
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			fmt.Printf("Login attempt: %s, user %s password: %s", c.RemoteAddr(), c.User(), string(pass))
 
-			return nil, errors.New("password login is disabled")
+			if _, ok := env.SshProxyClients[c.RemoteAddr().String()]; ok {
+				clientConfig := &ssh.ClientConfig{
+					HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+						return nil
+					},
+					User: env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.Username,
+					Auth: []ssh.AuthMethod{
+						ssh.Password(string(pass)),
+					},
+				}
+
+				client, err := ssh.Dial("tcp", env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.ProxyTo, clientConfig)
+				if err != nil {
+					log.Println("ERROR IN CALLBACKPW", err)
+					return nil, err
+				}
+
+				env.SshProxyClients[c.RemoteAddr().String()].SshClient = client
+
+				return nil, err
+			}
+
+			return nil, errors.New("can't find initial proxy connection")
 		},
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			fmt.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
 
-			env.SshServerClients[c.RemoteAddr()].Username = c.User()
-			env.SshServerClients[c.RemoteAddr()].PublicKey = key
+			if _, ok := env.SshProxyClients[c.RemoteAddr().String()]; ok {
+				var signers []ssh.Signer
 
-			clientConfig := &ssh.ClientConfig{
-				HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-					return nil
-				},
-				User: "root",
-			}
+				if env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.Agent != nil {
+					agent := *env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.Agent
 
-			//clientConfig.User = c.User()
-			clientConfig.Auth = []ssh.AuthMethod{
-				ssh.PublicKeys(signer),
-			}
+					signers, err = agent.Signers()
+					if err != nil {
+						log.Println("Error getting signers", err)
+					}
+				}
 
-			client, err := ssh.Dial("tcp", "proc0.gce.us.nomail.net:22", clientConfig)
-			if err != nil {
-				log.Println("ERROR IN CALLBACKPK", err)
+				if signers == nil {
+					signers = []ssh.Signer{signer}
+				}
+
+				clientConfig := &ssh.ClientConfig{
+					HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+						return nil
+					},
+					User: env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.Username,
+					Auth: []ssh.AuthMethod{
+						ssh.PublicKeys(signers...),
+					},
+				}
+
+				client, err := ssh.Dial("tcp", env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.ProxyTo, clientConfig)
+				if err != nil {
+					log.Println("ERROR IN CALLBACKPK", err)
+					return nil, err
+				}
+
+				env.SshProxyClients[c.RemoteAddr().String()].SshClient = client
+
 				return nil, err
 			}
 
-			env.SshProxyClients[c.RemoteAddr()] = &config.SshProxyClient{
-				Client: client,
-			}
-
-			return nil, err
+			return nil, errors.New("can't find initial proxy connection")
 		},
 	}
 
@@ -87,7 +121,7 @@ func startProxyServer(addr string, env *config.Env) {
 	defer listener.Close()
 
 	color.Set(color.FgGreen)
-	log.Println("Running SSH server at:", addr)
+	log.Println("Running SSH proxy server at:", addr)
 	color.Unset()
 
 	for {
@@ -101,10 +135,6 @@ func startProxyServer(addr string, env *config.Env) {
 
 		sshconn := &SshConn{Conn: tcpConn, config: sshConfig, callbackFn: callbackFn(env), wrapFn: wrapFn(env), closeFn: closeFn(env), env: env}
 
-		env.SshServerClients[tcpConn.RemoteAddr()] = &config.SshServerClient{
-			Client: sshconn.Conn,
-		}
-
 		go func() {
 			if err := sshconn.serve(); err != nil {
 				color.Set(color.FgRed)
@@ -115,6 +145,9 @@ func startProxyServer(addr string, env *config.Env) {
 			color.Set(color.FgRed)
 			log.Println("Connection closed.")
 			color.Unset()
+
+			delete(env.WebsocketClients, tcpConn.RemoteAddr().String())
+			delete(env.SshProxyClients, tcpConn.RemoteAddr().String())
 		}()
 
 		color.Set(color.FgGreen)
@@ -126,7 +159,7 @@ func startProxyServer(addr string, env *config.Env) {
 func callbackFn(env *config.Env) func(ssh.ConnMetadata) (*ssh.Client, error) {
 	return func(c ssh.ConnMetadata) (*ssh.Client, error) {
 		var err error
-		meta, ok := env.SshProxyClients[c.RemoteAddr()]
+		meta, ok := env.SshProxyClients[c.RemoteAddr().String()]
 		log.Println(meta, ok, env.SshProxyClients)
 		if !ok {
 			err = errors.New("Callback is bad.")
@@ -135,7 +168,7 @@ func callbackFn(env *config.Env) func(ssh.ConnMetadata) (*ssh.Client, error) {
 
 		fmt.Println(meta)
 
-		client := meta.Client
+		client := meta.SshClient
 		fmt.Printf("Connection accepted from: %s", c.RemoteAddr())
 
 		return client, err
@@ -144,7 +177,7 @@ func callbackFn(env *config.Env) func(ssh.ConnMetadata) (*ssh.Client, error) {
 
 func wrapFn(env *config.Env) func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error) {
 	return func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error) {
-		return asciicast.NewAsciicastReadCloser(r, 80, 40, env), nil
+		return asciicast.NewAsciicastReadCloser(r, c,80, 40, env), nil
 	}
 }
 

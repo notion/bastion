@@ -9,6 +9,8 @@ import (
 	"net/mail"
 	"net"
 	"time"
+	"golang.org/x/crypto/ssh/agent"
+	"github.com/gorilla/websocket"
 )
 
 type Config struct {
@@ -31,21 +33,31 @@ type Session struct {
 }
 
 type Env struct {
-	SshServerClients map[net.Addr]*SshServerClient
-	SshProxyClients map[net.Addr]*SshProxyClient
+	SshServerClients map[string]*SshServerClient
+	SshProxyClients map[string]*SshProxyClient
+	WebsocketClients map[string]map[string]*WsClient
 	DB *gorm.DB
 	Config *Config
 }
 
+type WsClient struct {
+	Client *websocket.Conn
+}
+
 type SshServerClient struct {
-	Client net.Conn
+	Client *ssh.ServerConn
+	RawProxyConn net.Conn
+	ProxyTo string
 	Username string
 	Password string
 	PublicKey ssh.PublicKey
+	Agent *agent.Agent
 }
 
 type SshProxyClient struct {
-	Client *ssh.Client
+	Client net.Conn
+	SshClient *ssh.Client
+	SshServerClient *SshServerClient
 }
 
 func Load() *Env {
@@ -63,8 +75,9 @@ func Load() *Env {
 	db.First(&config)
 
 	return &Env{
-		SshServerClients: make(map[net.Addr]*SshServerClient, 0),
-		SshProxyClients: make(map[net.Addr]*SshProxyClient, 0),
+		SshServerClients: make(map[string]*SshServerClient, 0),
+		SshProxyClients: make(map[string]*SshProxyClient, 0),
+		WebsocketClients: make(map[string]map[string]*WsClient, 0),
 		Config: &config,
 		DB: db,
 	}

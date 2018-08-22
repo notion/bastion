@@ -5,6 +5,7 @@ import (
 	"github.com/fatih/color"
 	"log"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/config"
 	"encoding/json"
 	"html/template"
@@ -13,6 +14,10 @@ import (
 	"context"
 	"fmt"
 )
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
 
 func logHTTP(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +49,9 @@ func Serve(addr string, env *config.Env) {
 
 	r.HandleFunc("/", index(env, conf))
 	r.HandleFunc("/sessions", sessionTempl(env, templs))
+	r.HandleFunc("/livesessions", liveSessionTempl(env, templs))
+	r.HandleFunc("/api/livesessions", liveSession(env))
+	r.HandleFunc("/api/ws/livesessions/{id}", liveSessionWS(env))
 	r.HandleFunc("/api/sessions", session(env))
 	r.HandleFunc("/api/sessions/{id}", sessionId(env))
 
@@ -79,7 +87,7 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 
 func sessionTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		templs.Lookup("cast").Execute(w, nil)
+		templs.Lookup("session").Execute(w, nil)
 	}
 }
 
@@ -124,5 +132,95 @@ func sessionId(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(session.Cast))
 		}
+	}
+}
+
+func liveSessionTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		templs.Lookup("livesession").Execute(w, nil)
+	}
+}
+
+func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		retData := make(map[string]interface{})
+
+		var newSessions []interface{}
+		for k, _ := range env.SshProxyClients {
+			sessionData := make(map[string]interface{})
+			sessionData["id"] = k
+			newSessions = append(newSessions, sessionData)
+		}
+
+		retData["status"] = "ok"
+		retData["livesessions"] = newSessions
+
+		jsonData, err := json.Marshal(retData)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write(jsonData)
+	}
+}
+
+func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		pathKey := vars["id"]
+
+		c, err := upgrader.Upgrade(w, r, nil)
+
+		color.Set(color.FgBlue)
+		log.Println("New WebSocket Connection From:", r.RemoteAddr)
+		log.Println("Path:", pathKey)
+		color.Unset()
+
+		if err != nil {
+			color.Set(color.FgRed)
+			log.Println("Upgrade error:", err)
+			color.Unset()
+			return
+		}
+
+		if _, ok := env.SshProxyClients[pathKey]; ok {
+			if _, ok := env.WebsocketClients[pathKey]; !ok {
+				env.WebsocketClients[pathKey] = make(map[string]*config.WsClient)
+			}
+
+			env.WebsocketClients[pathKey][c.RemoteAddr().String()] = &config.WsClient{
+				Client: c,
+			}
+		} else {
+			c.Close()
+			return
+		}
+
+		for {
+			_, p, err := c.ReadMessage()
+
+			sshProxyClient := *env.SshProxyClients[pathKey].SshClientSession
+			sshProxyClient.
+
+			if err != nil {
+				color.Set(color.FgRed)
+				log.Println("wsReader error:", err)
+				color.Unset()
+
+				break
+			}
+		}
+
+		defer func() {
+			c.Close()
+
+			delete(env.WebsocketClients[pathKey], c.RemoteAddr().String())
+
+			color.Set(color.FgMagenta)
+			log.Println("Closed WebSocket Connection From:", r.RemoteAddr)
+			color.Unset()
+		}()
 	}
 }

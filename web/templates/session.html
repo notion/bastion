@@ -1,0 +1,77 @@
+{{ define "session" }}
+{{ template "header" }}
+<style>
+    @media (min-width: 768px) {
+        .modal-xl {
+            width: 90%;
+        }
+    }
+</style>
+<div class="row">
+    <div id="sessions"><h2>Sessions:</h2>
+        <table class="table table-responsive table-striped table-bordered dt-responsive nowrap" id="sessions-table" cellspacing="0" width="100%">
+            <thead id="table-head-1">
+            <tr id="table-head-row-1">
+                <th>#</th>
+                <th>Play</th>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="playModal" tabindex="-1" role="dialog" aria-labelledby="playModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="playModalTitle">Session </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="playerSessionModal">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function playCast(id) {
+        $('#playerSessionModal').html(`
+            <asciinema-player id="sessionPlayer" poster="npt:0:0.1" font-size="small" preload="true" cols="1000" rows="60" src="/api/sessions/${id}"></asciinema-player>
+        `);
+
+        $('#playModal').modal({
+            show: true
+        });
+    }
+
+    $(function() {
+        $.getJSON('/api/sessions', function(data) {
+            if (data.sessions) {
+                for (var elem in data.sessions) {
+                    var session = data.sessions[elem];
+                    $("#sessions-table > tbody").append(`
+                        <tr>
+                            <th>${session.id}</th>
+                            <td><button onclick="playCast(${session.id})" class="btn btn-primary">Play</button></td>
+                        </tr>
+                    `);
+                }
+            }
+            sessions_table = $('#sessions-table').DataTable({
+                buttons: [
+                    'copy', 'csv', 'excel', 'pdf', 'print'
+                ]
+            });
+            sessions_table.buttons().container().appendTo('#sessions-table_wrapper .col-sm-6:eq(0)');
+        });
+    })
+</script>
+{{ template "footer" }}
+{{ end }}

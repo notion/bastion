@@ -2,25 +2,24 @@ package ssh
 
 import (
 	"log"
-	"github.com/kr/pty"
 	"sync"
 	"io"
 	"golang.org/x/crypto/ssh"
 	"fmt"
-	"os/exec"
 	"github.com/fatih/color"
 	"net"
 	"github.com/notion/trove_ssh_bastion/config"
 	"strconv"
 	"strings"
+	"golang.org/x/crypto/ssh/agent"
 )
 
-var (
-	//command = "ssh"
-	//args = []string{"proc0.gce.us.nomail.net"}
-	command = "bash"
-	args = make([]string, 0)
-)
+//var (
+//	//command = "ssh"
+//	//args = []string{"proc0.gce.us.nomail.net"}
+//	//command = "bash"
+//	//args = make([]string, 0)
+//)
 
 type forwardedTCPPayload struct {
 	Addr       string
@@ -87,9 +86,9 @@ func startServer(addr string, env *config.Env) {
 			continue
 		}
 
-		//env.SshServerClients[sshConn.RemoteAddr()] = &config.SshServerClient{
-		//	Client: sshConn,
-		//}
+		env.SshServerClients[sshConn.RemoteAddr().String()] = &config.SshServerClient{
+			Client: sshConn,
+		}
 
 		color.Set(color.FgGreen)
 		log.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), sshConn.ClientVersion())
@@ -165,61 +164,18 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *conf
 		return
 	}
 
-	// Fire up bash for this session
-	bash := exec.Command(command, args...)
-
 	// Prepare teardown function
 	closeConn := func() {
 		connection.Close()
-		_, err := bash.Process.Wait()
-		if err != nil {
-			log.Printf("Failed to exit bash (%s)", err)
-		}
 
-		delete(env.SshServerClients, sshConn.RemoteAddr())
+		delete(env.SshServerClients, sshConn.RemoteAddr().String())
 		log.Printf("Session closed")
-	}
-
-	// Allocate a terminal for this channel
-	log.Print("Creating pty...")
-	bashf, err := pty.Start(bash)
-	if err != nil {
-		log.Printf("Could not start pty (%s)", err)
-		closeConn()
-		return
 	}
 
 	// Sessions have out-of-band requests such as "shell", "pty-req" and "env"
 	go func() {
 		for req := range requests {
 			switch req.Type {
-			case "shell":
-				// We only accept the default shell
-				// (i.e. no command in the Payload)
-				if len(req.Payload) == 0 {
-					req.Reply(true, nil)
-
-					//pipe session to bash and visa-versa
-					var once sync.Once
-					go func() {
-						io.Copy(connection, bashf)
-						once.Do(closeConn)
-					}()
-					go func() {
-						io.Copy(bashf, connection)
-						once.Do(closeConn)
-					}()
-				}
-			case "pty-req":
-				termLen := req.Payload[3]
-				w, h := parseDims(req.Payload[termLen+4:])
-				SetWinsize(bashf.Fd(), w, h)
-				// Responding true (OK) here will let the client
-				// know we have a pty ready for input
-				req.Reply(true, nil)
-			case "window-change":
-				w, h := parseDims(req.Payload)
-				SetWinsize(bashf.Fd(), w, h)
 			case "subsystem":
 				subsys := string(req.Payload[4:])
 
@@ -229,8 +185,46 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *conf
 
 					host := strings.Replace(subsys, "proxy:", "", 1)
 
+					if _, ok := env.SshServerClients[sshConn.RemoteAddr().String()]; ok {
+						env.SshServerClients[sshConn.RemoteAddr().String()].Username = sshConn.User()
+						env.SshServerClients[sshConn.RemoteAddr().String()].ProxyTo = host
 
+
+						rawProxyConn, err := net.Dial("tcp", "localhost:2223")
+						if err != nil {
+							log.Println("SOMETHING IS BORKED DUD" )
+							closeConn()
+							return
+						}
+
+						env.SshProxyClients[rawProxyConn.LocalAddr().String()] = &config.SshProxyClient{
+							Client: rawProxyConn,
+							SshServerClient: env.SshServerClients[sshConn.RemoteAddr().String()],
+						}
+
+						var once sync.Once
+						go func() {
+							io.Copy(connection, rawProxyConn)
+							once.Do(closeConn)
+						}()
+						go func() {
+							io.Copy(rawProxyConn, connection)
+							once.Do(closeConn)
+						}()
+					} else {
+						log.Println("SOMETHING WENT WRONG")
+					}
 				}
+			case "auth-agent-req@openssh.com":
+				agentChan, agentReq, err := sshConn.OpenChannel("auth-agent@openssh.com", nil)
+				if err != nil {
+					log.Println("Can't open agent channel")
+				}
+
+				go ssh.DiscardRequests(agentReq)
+
+				loadedAgent := agent.NewClient(agentChan)
+				env.SshServerClients[sshConn.RemoteAddr().String()].Agent = &loadedAgent
 			default:
 				log.Println("UNKNOWN TYPE", req.Type)
 			}
