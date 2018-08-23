@@ -30,10 +30,24 @@ type Frame struct {
 	Data string
 }
 
+func (frame *Frame) Marshal() ([]byte, error) {
+	frameData := make([]interface{}, 3)
+
+	frameData[0] = frame.Time
+	frameData[1] = frame.Event
+	frameData[2] = frame.Data
+
+	return json.Marshal(frameData)
+}
+
+func (header *Header) Marshal() ([]byte, error) {
+	return json.Marshal(header)
+}
+
 func (cast *Cast) Marshal() (string, error) {
 	var fileFormat []string
 
-	headerJson, err := json.Marshal(cast.Header)
+	headerJson, err := cast.Header.Marshal()
 	if err != nil {
 		log.Println("Error marshaling header")
 	}
@@ -41,13 +55,7 @@ func (cast *Cast) Marshal() (string, error) {
 	fileFormat = append(fileFormat, string(headerJson))
 
 	for _, frame := range cast.Frames {
-		frameData := make([]interface{}, 3)
-
-		frameData[0] = frame.Time
-		frameData[1] = frame.Event
-		frameData[2] = frame.Data
-
-		frameJson, err := json.Marshal(frameData)
+		frameJson, err := frame.Marshal()
 		if err != nil {
 			log.Println("Error marshaling frame data")
 		}
@@ -58,7 +66,7 @@ func (cast *Cast) Marshal() (string, error) {
 	return strings.Join(fileFormat, "\n"), err
 }
 
-func Unmarshal(data string) (*Cast, error) {
+func UnmarshalCast(data string) (*Cast, error) {
 	var cast Cast
 
 	splitData := strings.Split(data, "\n")

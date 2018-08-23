@@ -11,6 +11,9 @@ import (
 	"time"
 	"golang.org/x/crypto/ssh/agent"
 	"github.com/gorilla/websocket"
+	"context"
+	"cloud.google.com/go/storage"
+	"google.golang.org/api/option"
 )
 
 type Config struct {
@@ -38,6 +41,7 @@ type Env struct {
 	WebsocketClients map[string]map[string]*WsClient
 	DB *gorm.DB
 	Config *Config
+	LogsBucket *storage.BucketHandle
 }
 
 type WsClient struct {
@@ -58,6 +62,7 @@ type SshProxyClient struct {
 	Client net.Conn
 	SshClient *ssh.Client
 	SshServerClient *SshServerClient
+	SshShellSession *ssh.Channel
 }
 
 func Load() *Env {
@@ -74,12 +79,21 @@ func Load() *Env {
 
 	db.First(&config)
 
+	ctx := context.Background()
+	storageClient, err := storage.NewClient(ctx, option.WithCredentialsFile("/Users/antoniomika/Downloads/***REMOVED***-89a4bde34ffb.json"))
+	if err != nil {
+		log.Println("Error initializing google cloud storage", err)
+	}
+
+	logsBucket := storageClient.Bucket("***REMOVED***")
+
 	return &Env{
 		SshServerClients: make(map[string]*SshServerClient, 0),
 		SshProxyClients: make(map[string]*SshProxyClient, 0),
 		WebsocketClients: make(map[string]map[string]*WsClient, 0),
 		Config: &config,
 		DB: db,
+		LogsBucket: logsBucket,
 	}
 }
 

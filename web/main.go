@@ -13,6 +13,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"context"
 	"fmt"
+	"io"
 )
 
 var upgrader = websocket.Upgrader{
@@ -94,20 +95,28 @@ func sessionTempl(env *config.Env, templs *template.Template) func(w http.Respon
 
 func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var sessions []config.Session
-		retData := make(map[string]interface{})
+		sessions := make([]string, 0)
 
-		env.DB.Find(&sessions)
+		ctx := context.Background()
+		objectsIterator := env.LogsBucket.Objects(ctx, nil)
 
-		var newSessions []interface{}
-		for _, x := range sessions {
-			sessionData := make(map[string]interface{})
-			sessionData["id"] = x.ID
-			newSessions = append(newSessions, sessionData)
+		var iteratorError error
+
+		for iteratorError == nil {
+			object, err := objectsIterator.Next()
+
+			if err != nil {
+				iteratorError = err
+				break
+			}
+
+			sessions = append(sessions, object.Name)
 		}
 
+		retData := make(map[string]interface{})
+
 		retData["status"] = "ok"
-		retData["sessions"] = newSessions
+		retData["sessions"] = sessions
 
 		jsonData, err := json.Marshal(retData)
 		if err != nil {
@@ -123,14 +132,14 @@ func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 func sessionId(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
+		ctx := context.Background()
 
-		var session config.Session
-
-		if env.DB.First(&session, vars["id"]).RecordNotFound() {
+		reader, err := env.LogsBucket.Object(vars["id"]).NewReader(ctx)
+		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(session.Cast))
+			io.Copy(w, reader)
 		}
 	}
 }
@@ -200,16 +209,25 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 
 		for {
 			_, p, err := c.ReadMessage()
-
-			sshProxyClient := *env.SshProxyClients[pathKey].SshClientSession
-			sshProxyClient.
-
 			if err != nil {
 				color.Set(color.FgRed)
 				log.Println("wsReader error:", err)
 				color.Unset()
 
 				break
+			}
+
+			sshProxyClient := *env.SshProxyClients[pathKey].SshShellSession
+
+			if sshProxyClient != nil {
+				_, err = sshProxyClient.Write(p)
+				if err != nil {
+					color.Set(color.FgRed)
+					log.Println("SSH Session Write Error:", err)
+					color.Unset()
+
+					break
+				}
 			}
 		}
 

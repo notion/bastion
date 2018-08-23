@@ -82,6 +82,10 @@ func (p *SshConn) serve() error {
 					break r
 				case "exec":
 					// not supported (yet)
+				case "shell":
+					if proxClient, ok := p.env.SshProxyClients[p.RemoteAddr().String()]; ok {
+						proxClient.SshShellSession = &dst
+					}
 				default:
 					log.Println(req.Type)
 				}

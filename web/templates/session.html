@@ -58,8 +58,8 @@
                     var session = data.sessions[elem];
                     $("#sessions-table > tbody").append(`
                         <tr>
-                            <th>${session.id}</th>
-                            <td><button onclick="playCast(${session.id})" class="btn btn-primary">Play</button></td>
+                            <th>${session}</th>
+                            <td><button onclick="playCast('${session}')" class="btn btn-primary">Play</button></td>
                         </tr>
                     `);
                 }
