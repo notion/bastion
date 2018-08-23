@@ -73,6 +73,22 @@
   version = "v1.6.2"
 
 [[projects]]
+  digest = "1:e72d1ebb8d395cf9f346fd9cbc652e5ae222dd85e0ac842dc57f175abed6d195"
+  name = "github.com/gorilla/securecookie"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "e59506cc896acb7f7bf732d4fdf5e25f7ccd8983"
+  version = "v1.1.1"
+
+[[projects]]
+  digest = "1:0fe783ea0c04c7d13f7c55d8f74b01b17e18a8320e7deecf578b41ef99b27205"
+  name = "github.com/gorilla/sessions"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "03b6f63cc43ef9c7240a635a5e22b13180e822b8"
+  version = "v1.1.1"
+
+[[projects]]
   digest = "1:cee8e8ac80df6373e7daa11baf1f98c1b6f7242c49ccae7e1ec34a971dc408d9"
   name = "github.com/gorilla/websocket"
   packages = ["."]
@@ -315,6 +331,7 @@
     "cloud.google.com/go/storage",
     "github.com/fatih/color",
     "github.com/gorilla/mux",
+    "github.com/gorilla/sessions",
     "github.com/gorilla/websocket",
     "github.com/jinzhu/gorm",
     "github.com/jinzhu/gorm/dialects/sqlite",
@@ -322,6 +339,7 @@
     "golang.org/x/crypto/ssh/agent",
     "golang.org/x/oauth2",
     "golang.org/x/oauth2/google",
+    "google.golang.org/api/option",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

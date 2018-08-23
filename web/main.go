@@ -11,14 +11,20 @@ import (
 	"html/template"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"github.com/gorilla/sessions"
 	"context"
 	"fmt"
 	"io"
+	"github.com/gorilla/securecookie"
+	"encoding/gob"
+	"io/ioutil"
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
+
+var store = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
 
 func logHTTP(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +46,8 @@ func Serve(addr string, env *config.Env) {
 		},
 		Endpoint: google.Endpoint,
 	}
+
+	gob.Register(&oauth2.Token{})
 
 	r := mux.NewRouter()
 
@@ -73,12 +81,38 @@ func Serve(addr string, env *config.Env) {
 func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
+
+		session, err := store.Get(r, "session")
+		if err != nil {
+			log.Println("Can't get session from request", err)
+		}
+
 		if code == "" {
-			http.Redirect(w, r, conf.AuthCodeURL("state"), http.StatusFound)
+			if k, ok := session.Values["auth"]; ok {
+				w.Write([]byte(fmt.Sprintf("%+v", k)))
+			} else {
+				http.Redirect(w, r, conf.AuthCodeURL("state"), http.StatusFound)
+			}
 		} else {
 			token, err := conf.Exchange(context.TODO(), code)
 			if err != nil {
 				log.Println("ISSUE EXCHANGING CODE:", err)
+			}
+
+			client := conf.Client(context.TODO(), token)
+
+			resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+			if err != nil {
+				log.Println("ERROR GETTING USER INFO", err)
+			}
+			defer resp.Body.Close()
+			data, _ := ioutil.ReadAll(resp.Body)
+			log.Println("Resp body: ", string(data))
+
+			session.Values["auth"] = token
+			err = session.Save(r, w)
+			if err != nil {
+				log.Println("Error saving session:", err)
 			}
 
 			w.Write([]byte(fmt.Sprintf("%+v", token)))
