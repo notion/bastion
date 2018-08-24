@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"net/mail"
 	"net"
+	"os"
 	"time"
 	"golang.org/x/crypto/ssh/agent"
 	"github.com/gorilla/websocket"
@@ -80,7 +81,7 @@ func Load() *Env {
 	db.First(&config)
 
 	ctx := context.Background()
-	storageClient, err := storage.NewClient(ctx, option.WithCredentialsFile("/Users/antoniomika/Downloads/***REMOVED***-89a4bde34ffb.json"))
+	storageClient, err := storage.NewClient(ctx, option.WithCredentialsFile(os.Getenv("HOME") + "/Downloads/***REMOVED***-89a4bde34ffb.json"))
 	if err != nil {
 		log.Println("Error initializing google cloud storage", err)
 	}
