@@ -158,7 +158,14 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 
 func sessionTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		templs.Lookup("session").Execute(w, nil)
+		session, err := store.Get(r, "session")
+		if err != nil {
+			log.Println("Can't get session from request", err)
+		}
+
+		userData := session.Values["user"].(*config.User)
+
+		templs.Lookup("session").Execute(w, userData)
 	}
 }
 
@@ -216,7 +223,14 @@ func sessionId(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 func liveSessionTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		templs.Lookup("livesession").Execute(w, nil)
+		session, err := store.Get(r, "session")
+		if err != nil {
+			log.Println("Can't get session from request", err)
+		}
+
+		userData := session.Values["user"].(*config.User)
+
+		templs.Lookup("livesession").Execute(w, userData)
 	}
 }
 
