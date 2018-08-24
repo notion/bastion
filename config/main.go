@@ -1,20 +1,19 @@
 package config
 
 import (
+	"cloud.google.com/go/storage"
+	"context"
+	"github.com/fatih/color"
+	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/fatih/color"
-	"log"
 	"golang.org/x/crypto/ssh"
-	"net/mail"
+	"golang.org/x/crypto/ssh/agent"
+	"google.golang.org/api/option"
+	"log"
 	"net"
 	"os"
 	"time"
-	"golang.org/x/crypto/ssh/agent"
-	"github.com/gorilla/websocket"
-	"context"
-	"cloud.google.com/go/storage"
-	"google.golang.org/api/option"
 )
 
 type Config struct {
@@ -24,16 +23,19 @@ type Config struct {
 
 type User struct {
 	gorm.Model
-	Email mail.Address `gorm:"type:varchar(255);"`
+	Email string `gorm:"type:varchar(255);"`
 	AuthToken string `gorm:"type:MEDIUMTEXT;"`
 	PrivateKey []byte
 }
 
 type Session struct {
 	gorm.Model
-	//User *User
+	Name string
 	Time time.Time
 	Cast string `gorm:"type:LONGTEXT;"`
+	UserID uint
+	User *User
+	Host string
 }
 
 type Env struct {
@@ -57,6 +59,7 @@ type SshServerClient struct {
 	Password string
 	PublicKey ssh.PublicKey
 	Agent *agent.Agent
+	User *User
 }
 
 type SshProxyClient struct {
@@ -64,6 +67,7 @@ type SshProxyClient struct {
 	SshClient *ssh.Client
 	SshServerClient *SshServerClient
 	SshShellSession *ssh.Channel
+	Closer *AsciicastReadCloser
 }
 
 func Load() *Env {
@@ -73,6 +77,7 @@ func Load() *Env {
 		log.Println("Error loading config:", err)
 		color.Unset()
 	}
+	db.LogMode(true)
 
 	db.AutoMigrate(&Config{}, &User{}, &Session{})
 

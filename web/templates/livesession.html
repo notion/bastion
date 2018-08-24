@@ -19,6 +19,9 @@
             <thead id="table-head-1">
             <tr id="table-head-row-1">
                 <th>#</th>
+                <th>Host</th>
+                <th>Email</th>
+                <th>Name</th>
                 <th>Join</th>
             </tr>
             </thead>
@@ -53,7 +56,12 @@
             window.OpenSocket.close();
         }
 
-        var websocket = new WebSocket("ws://" + window.location.hostname + ":" + window.location.port + "/api/ws/livesessions/" + id);
+        var scheme = "ws://";
+        if (window.location.protocol === "https:") {
+            scheme = "wss://";
+        }
+
+        var websocket = new WebSocket(scheme + window.location.hostname + ":" + window.location.port + "/api/ws/livesessions/" + id);
         websocket.onopen = function(evt) {
             term = new Terminal({
                 cursorBlink: true,
@@ -75,11 +83,15 @@
         $.getJSON('/api/livesessions', function(data) {
             if (data.livesessions) {
                 for (var elem in data.livesessions) {
+                    var place = parseInt(elem) + 1;
                     var session = data.livesessions[elem];
                     $("#sessions-table > tbody").append(`
                         <tr>
-                            <th>${session.id}</th>
-                            <td><button onclick="playCast('${session.id}')" class="btn btn-primary">Join</button></td>
+                            <th>${place}</th>
+                            <th>${session.Host}</th>
+                            <th>${session.User}</th>
+                            <th>${session.Name}</th>
+                            <td><button onclick="playCast('${session.Name}')" class="btn btn-primary">Join</button></td>
                         </tr>
                     `);
                 }

@@ -1,11 +1,11 @@
-package asciicast
+package config
 
 import (
+	"github.com/notion/trove_ssh_bastion/asciicast"
 	"io"
 	"time"
 	"bytes"
 	"log"
-	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/crypto/ssh"
 	"github.com/gorilla/websocket"
 	"github.com/fatih/color"
@@ -13,13 +13,13 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, height int, env *config.Env) io.ReadCloser {
+func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, height int, env *Env) io.ReadCloser {
 	closer :=  &AsciicastReadCloser{
 		ReadCloser: r,
 		SshConn: conn,
 		Time: time.Now(),
-		Cast: &Cast{
-			Header: &Header{
+		Cast: &asciicast.Cast{
+			Header: &asciicast.Header{
 				Version: 2,
 				Width: width,
 				Height: height,
@@ -53,6 +53,12 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 		}
 	}
 
+	if client, ok := env.SshProxyClients[conn.RemoteAddr().String()]; ok {
+		env.SshProxyClients[conn.RemoteAddr().String()].Closer = closer
+		closer.User = client.SshServerClient.User
+		closer.Host = client.SshServerClient.ProxyTo
+	}
+
 	return closer
 }
 
@@ -60,12 +66,14 @@ type AsciicastReadCloser struct {
 	io.ReadCloser
 
 	SshConn ssh.ConnMetadata
-	Cast   *Cast
+	Cast   *asciicast.Cast
 	Time   time.Time
 	Buffer bytes.Buffer
-	Env    *config.Env
+	Env    *Env
 	BkWriter *storage.Writer
 	BkContext context.Context
+	User *User
+	Host string
 }
 
 func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
@@ -74,7 +82,7 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 	now := time.Now()
 	duration := now.Sub(lr.Time).Seconds()
 
-	newFrame := &Frame{
+	newFrame := &asciicast.Frame{
 		Time: duration,
 		Event: "o",
 		Data: bytes.NewBuffer(p[0:n]).String(),
@@ -122,9 +130,15 @@ func (lr *AsciicastReadCloser) Close() error {
 		log.Println("Error logging session", err)
 	}
 
-	session := &config.Session{
+	session := &Session{
+		Name: lr.BkWriter.Name,
 		Time: lr.Time,
 		Cast: data,
+		Host: lr.Host,
+	}
+
+	if lr.User != nil {
+		session.UserID = lr.User.ID
 	}
 
 	lr.Env.DB.Save(session)

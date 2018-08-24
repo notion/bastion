@@ -1,42 +1,43 @@
 package web
 
 import (
-	"net/http"
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/gob"
+	"encoding/json"
 	"github.com/fatih/color"
-	"log"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/securecookie"
+	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/config"
-	"encoding/json"
-	"html/template"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"github.com/gorilla/sessions"
-	"context"
-	"fmt"
+	"html/template"
 	"io"
-	"github.com/gorilla/securecookie"
-	"encoding/gob"
 	"io/ioutil"
+	"log"
+	"net/http"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
+var (
+	upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
 
-var store = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
-
-func logHTTP(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		color.Set(color.FgYellow)
-		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
-		color.Unset()
-
-		handler.ServeHTTP(w, r)
-	})
-}
+	storeName = "session"
+	store = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
+)
 
 func Serve(addr string, env *config.Env) {
+	templs, err := template.ParseGlob("web/templates/*")
+	if err != nil {
+		log.Println("ERROR PARSING TEMPLATE GLOB:", err)
+	}
+
+	store.MaxAge(1 * 60 * 60)
+
 	conf := oauth2.Config{
 		ClientID: "***REMOVED***",
 		ClientSecret: "***REMOVED***",
@@ -48,21 +49,20 @@ func Serve(addr string, env *config.Env) {
 	}
 
 	gob.Register(&oauth2.Token{})
+	gob.Register(&config.User{})
 
 	r := mux.NewRouter()
 
-	templs, err := template.ParseGlob("web/templates/*")
-	if err != nil {
-		log.Println("ERROR PARSING TEMPLATE GLOB:", err)
-	}
+	authedRouter := r.PathPrefix("/").Subrouter()
+	authedRouter.Use(authMiddleware)
 
 	r.HandleFunc("/", index(env, conf))
-	r.HandleFunc("/sessions", sessionTempl(env, templs))
-	r.HandleFunc("/livesessions", liveSessionTempl(env, templs))
-	r.HandleFunc("/api/livesessions", liveSession(env))
-	r.HandleFunc("/api/ws/livesessions/{id}", liveSessionWS(env))
-	r.HandleFunc("/api/sessions", session(env))
-	r.HandleFunc("/api/sessions/{id}", sessionId(env))
+	authedRouter.HandleFunc("/sessions", sessionTempl(env, templs))
+	authedRouter.HandleFunc("/livesessions", liveSessionTempl(env, templs))
+	authedRouter.HandleFunc("/api/livesessions", liveSession(env))
+	authedRouter.HandleFunc("/api/ws/livesessions/{id}", liveSessionWS(env))
+	authedRouter.HandleFunc("/api/sessions", session(env))
+	authedRouter.HandleFunc("/api/sessions/{id}", sessionId(env))
 
 	srv := &http.Server{
 		Handler:      logHTTP(r),
@@ -88,34 +88,70 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 		}
 
 		if code == "" {
-			if k, ok := session.Values["auth"]; ok {
-				w.Write([]byte(fmt.Sprintf("%+v", k)))
-			} else {
-				http.Redirect(w, r, conf.AuthCodeURL("state"), http.StatusFound)
-			}
-		} else {
-			token, err := conf.Exchange(context.TODO(), code)
-			if err != nil {
-				log.Println("ISSUE EXCHANGING CODE:", err)
+			if k, ok := session.Values["loggedin"]; ok {
+				if k.(bool) {
+					http.Redirect(w, r, "/sessions", http.StatusFound)
+					return
+				}
 			}
 
-			client := conf.Client(context.TODO(), token)
+			state := sha256.Sum256(securecookie.GenerateRandomKey(32))
 
-			resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
-			if err != nil {
-				log.Println("ERROR GETTING USER INFO", err)
-			}
-			defer resp.Body.Close()
-			data, _ := ioutil.ReadAll(resp.Body)
-			log.Println("Resp body: ", string(data))
-
-			session.Values["auth"] = token
+			session.Values["state"] = base64.URLEncoding.EncodeToString(state[:])
 			err = session.Save(r, w)
 			if err != nil {
 				log.Println("Error saving session:", err)
 			}
 
-			w.Write([]byte(fmt.Sprintf("%+v", token)))
+			http.Redirect(w, r, conf.AuthCodeURL(session.Values["state"].(string)), http.StatusFound)
+			return
+		} else {
+			if r.URL.Query().Get("state") == session.Values["state"] {
+				token, err := conf.Exchange(context.TODO(), code)
+				if err != nil {
+					log.Println("ISSUE EXCHANGING CODE:", err)
+				}
+
+				client := conf.Client(context.TODO(), token)
+
+				resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+				if err != nil {
+					log.Println("ERROR GETTING USER INFO", err)
+				}
+				defer resp.Body.Close()
+
+				userData := make(map[string]interface{})
+
+				data, _ := ioutil.ReadAll(resp.Body)
+
+				err = json.Unmarshal(data, &userData)
+				if err != nil {
+					log.Println("Unable to unmarshal user info from google", err)
+				}
+
+				var user config.User
+
+				env.DB.First(&user, "email = ?", userData["email"].(string))
+
+				user.Email = userData["email"].(string)
+				user.AuthToken = token.AccessToken
+
+				session.Values["user"] = user
+				session.Values["auth"] = token
+				session.Values["loggedin"] = true
+				err = session.Save(r, w)
+				if err != nil {
+					log.Println("Error saving session:", err)
+				}
+
+				env.DB.Save(&user)
+
+				http.Redirect(w, r, "/sessions", http.StatusFound)
+				return
+			} else {
+				http.Redirect(w, r, "/", http.StatusFound)
+				return
+			}
 		}
 	}
 }
@@ -129,7 +165,7 @@ func sessionTempl(env *config.Env, templs *template.Template) func(w http.Respon
 
 func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sessions := make([]string, 0)
+		sessionsData := make([]*config.Session, 0)
 
 		ctx := context.Background()
 		objectsIterator := env.LogsBucket.Objects(ctx, nil)
@@ -137,6 +173,9 @@ func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		var iteratorError error
 
 		for iteratorError == nil {
+			var dbSession config.Session
+			var dbUser config.User
+
 			object, err := objectsIterator.Next()
 
 			if err != nil {
@@ -144,22 +183,19 @@ func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			sessions = append(sessions, object.Name)
+			env.DB.Select([]string{"user_id", "time", "name", "host"}).First(&dbSession, "name = ?", object.Name).Select([]string{"email"}).Related(&dbUser, "UserID")
+
+			dbSession.User = &dbUser
+
+			sessionsData = append(sessionsData, &dbSession)
 		}
 
 		retData := make(map[string]interface{})
 
 		retData["status"] = "ok"
-		retData["sessions"] = sessions
+		retData["sessions"] = sessionsData
 
-		jsonData, err := json.Marshal(retData)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write(jsonData)
+		returnJson(w, r, retData, 0)
 	}
 }
 
@@ -189,9 +225,11 @@ func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		retData := make(map[string]interface{})
 
 		var newSessions []interface{}
-		for k, _ := range env.SshProxyClients {
+		for k, client := range env.SshProxyClients {
 			sessionData := make(map[string]interface{})
-			sessionData["id"] = k
+			sessionData["Name"] = k
+			sessionData["Host"] = client.SshServerClient.ProxyTo
+			sessionData["User"] = client.SshServerClient.User.Email
 			newSessions = append(newSessions, sessionData)
 		}
 
@@ -228,7 +266,7 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		if _, ok := env.SshProxyClients[pathKey]; ok {
+		if proxyClient, ok := env.SshProxyClients[pathKey]; ok {
 			if _, ok := env.WebsocketClients[pathKey]; !ok {
 				env.WebsocketClients[pathKey] = make(map[string]*config.WsClient)
 			}
@@ -236,6 +274,17 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 			env.WebsocketClients[pathKey][c.RemoteAddr().String()] = &config.WsClient{
 				Client: c,
 			}
+
+			wsWriter, err := c.NextWriter(websocket.TextMessage)
+			if err != nil {
+				log.Println("Error establishing ws writer in playback")
+			}
+
+			for _, frame := range proxyClient.Closer.Cast.Frames {
+				wsWriter.Write([]byte(frame.Data))
+			}
+
+			wsWriter.Close()
 		} else {
 			c.Close()
 			return
@@ -251,16 +300,18 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 				break
 			}
 
-			sshProxyClient := *env.SshProxyClients[pathKey].SshShellSession
+			if _, ok := env.SshProxyClients[pathKey]; ok {
+				sshProxyClient := *env.SshProxyClients[pathKey].SshShellSession
 
-			if sshProxyClient != nil {
-				_, err = sshProxyClient.Write(p)
-				if err != nil {
-					color.Set(color.FgRed)
-					log.Println("SSH Session Write Error:", err)
-					color.Unset()
+				if sshProxyClient != nil {
+					_, err = sshProxyClient.Write(p)
+					if err != nil {
+						color.Set(color.FgRed)
+						log.Println("SSH Session Write Error:", err)
+						color.Unset()
 
-					break
+						break
+					}
 				}
 			}
 		}

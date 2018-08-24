@@ -24,15 +24,11 @@ func (p *SshConn) serve() error {
 		return (err)
 	}
 
-	defer serverConn.Close()
-
 	clientConn, err := p.callbackFn(serverConn)
 	if err != nil {
 		log.Printf("%s", err.Error())
 		return (err)
 	}
-
-	defer clientConn.Close()
 
 	go ssh.DiscardRequests(reqs)
 
@@ -48,6 +44,11 @@ func (p *SshConn) serve() error {
 		if err != nil {
 			log.Printf("Could not accept server channel: %s", err.Error())
 			return err
+		}
+
+		closeConn := func() {
+			serverConn.Close()
+			clientConn.Close()
 		}
 
 		// connect requests
@@ -93,6 +94,8 @@ func (p *SshConn) serve() error {
 
 			channel.Close()
 			channel2.Close()
+
+			defer closeConn()
 		}()
 
 		// connect channels
@@ -102,15 +105,19 @@ func (p *SshConn) serve() error {
 		var wrappedChannel2 io.ReadCloser = channel2
 
 		if p.wrapFn != nil {
-			// wrappedChannel, err = p.wrapFn(channel)
 			wrappedChannel2, err = p.wrapFn(serverConn, channel2)
 		}
 
 		go io.Copy(channel2, wrappedChannel)
 		go io.Copy(channel, wrappedChannel2)
 
-		defer wrappedChannel.Close()
-		defer wrappedChannel2.Close()
+		closeChans := func() {
+			wrappedChannel.Close()
+			wrappedChannel2.Close()
+		}
+
+		defer closeConn()
+		defer closeChans()
 	}
 
 	if p.closeFn != nil {

@@ -1,15 +1,14 @@
 package ssh
 
 import (
-	"github.com/fatih/color"
-	"log"
-	"golang.org/x/crypto/ssh"
-	"github.com/notion/trove_ssh_bastion/config"
-	"net"
-	"fmt"
-	"io"
-	"github.com/notion/trove_ssh_bastion/asciicast"
 	"errors"
+	"fmt"
+	"github.com/fatih/color"
+	"github.com/notion/trove_ssh_bastion/config"
+	"golang.org/x/crypto/ssh"
+	"io"
+	"log"
+	"net"
 )
 
 func startProxyServer(addr string, env *config.Env) {
@@ -146,8 +145,8 @@ func startProxyServer(addr string, env *config.Env) {
 			log.Println("Connection closed.")
 			color.Unset()
 
-			delete(env.WebsocketClients, tcpConn.RemoteAddr().String())
 			delete(env.SshProxyClients, tcpConn.RemoteAddr().String())
+			delete(env.WebsocketClients, tcpConn.RemoteAddr().String())
 		}()
 
 		color.Set(color.FgGreen)
@@ -177,7 +176,7 @@ func callbackFn(env *config.Env) func(ssh.ConnMetadata) (*ssh.Client, error) {
 
 func wrapFn(env *config.Env) func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error) {
 	return func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error) {
-		return asciicast.NewAsciicastReadCloser(r, c,80, 40, env), nil
+		return config.NewAsciicastReadCloser(r, c,80, 40, env), nil
 	}
 }
 

@@ -13,6 +13,9 @@
             <thead id="table-head-1">
             <tr id="table-head-row-1">
                 <th>#</th>
+                <th>Host</th>
+                <th>Email</th>
+                <th>Name</th>
                 <th>Play</th>
             </tr>
             </thead>
@@ -55,11 +58,15 @@
         $.getJSON('/api/sessions', function(data) {
             if (data.sessions) {
                 for (var elem in data.sessions) {
+                    var place = parseInt(elem) + 1;
                     var session = data.sessions[elem];
                     $("#sessions-table > tbody").append(`
                         <tr>
-                            <th>${session}</th>
-                            <td><button onclick="playCast('${session}')" class="btn btn-primary">Play</button></td>
+                            <th>${place}</th>
+                            <th>${session.Host}</th>
+                            <th>${session.User.Email}</th>
+                            <th>${session.Name}</th>
+                            <td><button onclick="playCast('${session.Name}')" class="btn btn-primary">Play</button></td>
                         </tr>
                     `);
                 }

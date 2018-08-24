@@ -225,6 +225,23 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *conf
 
 				loadedAgent := agent.NewClient(agentChan)
 				env.SshServerClients[sshConn.RemoteAddr().String()].Agent = &loadedAgent
+
+				keys, err := loadedAgent.List()
+				if err != nil {
+					log.Println("Error loading key list from agent", err)
+				}
+
+				if len(keys) > 0 {
+					env.SshServerClients[sshConn.RemoteAddr().String()].PublicKey = keys[0]
+
+					var sessionUser config.User
+
+					env.DB.First(&sessionUser, "private_key = ?", keys[0].Blob)
+
+					log.Println(&sessionUser)
+
+					env.SshServerClients[sshConn.RemoteAddr().String()].User = &sessionUser
+				}
 			default:
 				log.Println("UNKNOWN TYPE", req.Type)
 			}
