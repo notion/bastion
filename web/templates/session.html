@@ -1,5 +1,5 @@
 {{ define "session" }}
-{{ template "header" }}
+{{ template "header" .}}
 <style>
     @media (min-width: 768px) {
         .modal-xl {
@@ -80,5 +80,5 @@
         });
     })
 </script>
-{{ template "footer" }}
+{{ template "footer" .}}
 {{ end }}
