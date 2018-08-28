@@ -1,17 +1,17 @@
 package ssh
 
 import (
-	"log"
-	"sync"
-	"io"
-	"golang.org/x/crypto/ssh"
 	"fmt"
 	"github.com/fatih/color"
-	"net"
 	"github.com/notion/trove_ssh_bastion/config"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
+	"io"
+	"log"
+	"net"
 	"strconv"
 	"strings"
-	"golang.org/x/crypto/ssh/agent"
+	"sync"
 )
 
 //var (
@@ -139,7 +139,7 @@ func handleProxy(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *config
 		log.Println(err)
 	}
 
-	conn, err := net.Dial("tcp", payload.Addr + ":" + strconv.FormatUint(uint64(payload.Port), 10))
+	conn, err := net.Dial("tcp", payload.Addr+":"+strconv.FormatUint(uint64(payload.Port), 10))
 	if err != nil {
 		log.Println(err)
 	}
@@ -189,16 +189,15 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, env *conf
 						env.SshServerClients[sshConn.RemoteAddr().String()].Username = sshConn.User()
 						env.SshServerClients[sshConn.RemoteAddr().String()].ProxyTo = host
 
-
 						rawProxyConn, err := net.Dial("tcp", "localhost:2223")
 						if err != nil {
-							log.Println("SOMETHING IS BORKED DUD" )
+							log.Println("SOMETHING IS BORKED DUD")
 							closeConn()
 							return
 						}
 
 						env.SshProxyClients[rawProxyConn.LocalAddr().String()] = &config.SshProxyClient{
-							Client: rawProxyConn,
+							Client:          rawProxyConn,
 							SshServerClient: env.SshServerClients[sshConn.RemoteAddr().String()],
 						}
 

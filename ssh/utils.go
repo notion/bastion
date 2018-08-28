@@ -1,14 +1,14 @@
 package ssh
 
 import (
-	"github.com/notion/trove_ssh_bastion/config"
-	"crypto/rsa"
 	"crypto/rand"
-	"github.com/fatih/color"
-	"log"
-	"encoding/pem"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
+	"encoding/pem"
+	"github.com/fatih/color"
+	"github.com/notion/trove_ssh_bastion/config"
+	"log"
 	"syscall"
 	"unsafe"
 )
@@ -27,7 +27,7 @@ func createPrivateKey(env *config.Env) []byte {
 
 	pemdata := pem.EncodeToMemory(
 		&pem.Block{
-			Type: "RSA PRIVATE KEY",
+			Type:  "RSA PRIVATE KEY",
 			Bytes: x509.MarshalPKCS1PrivateKey(pk),
 		},
 	)
@@ -38,7 +38,6 @@ func createPrivateKey(env *config.Env) []byte {
 
 	return bytes
 }
-
 
 func parseDims(b []byte) (uint32, uint32) {
 	w := binary.BigEndian.Uint32(b)

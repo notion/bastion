@@ -27,7 +27,7 @@ var (
 	}
 
 	storeName = "session"
-	store = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
+	store     = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
 )
 
 func Serve(addr string, env *config.Env) {
@@ -39,9 +39,9 @@ func Serve(addr string, env *config.Env) {
 	store.MaxAge(1 * 60 * 60)
 
 	conf := oauth2.Config{
-		ClientID: "***REMOVED***",
+		ClientID:     "***REMOVED***",
 		ClientSecret: "***REMOVED***",
-		RedirectURL: "http://localhost:8080",
+		RedirectURL:  "http://localhost:8080",
 		Scopes: []string{
 			"https://www.googleapis.com/auth/userinfo.email",
 		},
@@ -65,8 +65,8 @@ func Serve(addr string, env *config.Env) {
 	authedRouter.HandleFunc("/api/sessions/{id}", sessionId(env))
 
 	srv := &http.Server{
-		Handler:      logHTTP(r),
-		Addr:         addr,
+		Handler: logHTTP(r),
+		Addr:    addr,
 	}
 
 	color.Set(color.FgGreen)
@@ -168,7 +168,6 @@ func sessionTempl(env *config.Env, templs *template.Template) func(w http.Respon
 		templs.Lookup("session").Execute(w, userData)
 	}
 }
-
 
 func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {

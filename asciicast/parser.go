@@ -12,22 +12,22 @@ type Cast struct {
 }
 
 type Header struct {
-	Version int `json:"version"`
-	Width int `json:"width"`
-	Height int `json:"height"`
-	Timestamp int64 `json:"timestamp,omitempty"`
-	Duration float64 `json:"duration,omitempty"`
-	IdleTimeLimit float64 `json:"idle_time_limit,omitempty"`
-	Command string `json:"command,omitempty"`
-	Title string `json:"title,omitempty"`
-	Env map[string]string `json:"env,omitempty"`
-	Theme map[string]string `json:"theme,omitempty"`
+	Version       int               `json:"version"`
+	Width         int               `json:"width"`
+	Height        int               `json:"height"`
+	Timestamp     int64             `json:"timestamp,omitempty"`
+	Duration      float64           `json:"duration,omitempty"`
+	IdleTimeLimit float64           `json:"idle_time_limit,omitempty"`
+	Command       string            `json:"command,omitempty"`
+	Title         string            `json:"title,omitempty"`
+	Env           map[string]string `json:"env,omitempty"`
+	Theme         map[string]string `json:"theme,omitempty"`
 }
 
 type Frame struct {
-	Time float64
+	Time  float64
 	Event string
-	Data string
+	Data  string
 }
 
 func (frame *Frame) Marshal() ([]byte, error) {
@@ -91,9 +91,9 @@ func UnmarshalCast(data string) (*Cast, error) {
 		}
 
 		frameStruct := &Frame{
-			Time: frameSlice[0].(float64),
+			Time:  frameSlice[0].(float64),
 			Event: frameSlice[1].(string),
-			Data: frameSlice[2].(string),
+			Data:  frameSlice[2].(string),
 		}
 
 		cast.Frames = append(cast.Frames, frameStruct)

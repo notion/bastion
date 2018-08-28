@@ -1,28 +1,28 @@
 package config
 
 import (
-	"github.com/notion/trove_ssh_bastion/asciicast"
-	"io"
-	"time"
 	"bytes"
-	"log"
-	"golang.org/x/crypto/ssh"
-	"github.com/gorilla/websocket"
-	"github.com/fatih/color"
-	"context"
 	"cloud.google.com/go/storage"
+	"context"
+	"github.com/fatih/color"
+	"github.com/gorilla/websocket"
+	"github.com/notion/trove_ssh_bastion/asciicast"
+	"golang.org/x/crypto/ssh"
+	"io"
+	"log"
+	"time"
 )
 
 func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, height int, env *Env) io.ReadCloser {
-	closer :=  &AsciicastReadCloser{
+	closer := &AsciicastReadCloser{
 		ReadCloser: r,
-		SshConn: conn,
-		Time: time.Now(),
+		SshConn:    conn,
+		Time:       time.Now(),
 		Cast: &asciicast.Cast{
 			Header: &asciicast.Header{
-				Version: 2,
-				Width: width,
-				Height: height,
+				Version:   2,
+				Width:     width,
+				Height:    height,
 				Timestamp: time.Now().Unix(),
 			},
 		},
@@ -65,15 +65,15 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 type AsciicastReadCloser struct {
 	io.ReadCloser
 
-	SshConn ssh.ConnMetadata
-	Cast   *asciicast.Cast
-	Time   time.Time
-	Buffer bytes.Buffer
-	Env    *Env
-	BkWriter *storage.Writer
+	SshConn   ssh.ConnMetadata
+	Cast      *asciicast.Cast
+	Time      time.Time
+	Buffer    bytes.Buffer
+	Env       *Env
+	BkWriter  *storage.Writer
 	BkContext context.Context
-	User *User
-	Host string
+	User      *User
+	Host      string
 }
 
 func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
@@ -83,9 +83,9 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 	duration := now.Sub(lr.Time).Seconds()
 
 	newFrame := &asciicast.Frame{
-		Time: duration,
+		Time:  duration,
 		Event: "o",
-		Data: bytes.NewBuffer(p[0:n]).String(),
+		Data:  bytes.NewBuffer(p[0:n]).String(),
 	}
 
 	marshalledFrame, err := newFrame.Marshal()

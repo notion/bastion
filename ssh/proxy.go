@@ -1,11 +1,11 @@
 package ssh
 
 import (
-	"net"
+	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/crypto/ssh"
 	"io"
 	"log"
-	"github.com/notion/trove_ssh_bastion/config"
+	"net"
 )
 
 type SshConn struct {

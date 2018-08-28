@@ -176,7 +176,7 @@ func callbackFn(env *config.Env) func(ssh.ConnMetadata) (*ssh.Client, error) {
 
 func wrapFn(env *config.Env) func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error) {
 	return func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error) {
-		return config.NewAsciicastReadCloser(r, c,80, 40, env), nil
+		return config.NewAsciicastReadCloser(r, c, 80, 40, env), nil
 	}
 }
 
