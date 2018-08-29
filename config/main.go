@@ -26,6 +26,7 @@ type User struct {
 	Email      string `gorm:"type:varchar(255);"`
 	AuthToken  string `gorm:"type:MEDIUMTEXT;"`
 	PrivateKey []byte
+	Authorized bool `gorm:"default:false"`
 }
 
 type Session struct {

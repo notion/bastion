@@ -59,6 +59,9 @@ func Serve(addr string, env *config.Env) {
 	r.HandleFunc("/", index(env, conf))
 	authedRouter.HandleFunc("/sessions", sessionTempl(env, templs))
 	authedRouter.HandleFunc("/livesessions", liveSessionTempl(env, templs))
+	authedRouter.HandleFunc("/users", userTempl(env, templs))
+	authedRouter.HandleFunc("/api/users", user(env))
+	authedRouter.HandleFunc("/api/user/{id}", updateUser(env))
 	authedRouter.HandleFunc("/api/livesessions", liveSession(env))
 	authedRouter.HandleFunc("/api/ws/livesessions/{id}", liveSessionWS(env))
 	authedRouter.HandleFunc("/api/sessions", session(env))
@@ -338,5 +341,64 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 			log.Println("Closed WebSocket Connection From:", r.RemoteAddr)
 			color.Unset()
 		}()
+	}
+}
+
+func userTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session, err := store.Get(r, "session")
+		if err != nil {
+			log.Println("Can't get session from request", err)
+		}
+
+		userData := session.Values["user"].(*config.User)
+
+		templs.Lookup("user").Execute(w, userData)
+	}
+}
+
+func user(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		retData := make(map[string]interface{})
+		var users []config.User
+
+		env.DB.Find(&users)
+
+		retData["status"] = "ok"
+		retData["users"] = users
+
+		returnJson(w, r, retData, 0)
+	}
+}
+
+func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			http.Redirect(w, r, "/users", http.StatusFound)
+			return
+		}
+
+		vars := mux.Vars(r)
+		retData := make(map[string]interface{})
+		var user config.User
+
+		env.DB.Find(&user, vars["id"])
+		r.ParseForm()
+
+		decoded, err := base64.StdEncoding.DecodeString(r.Form.Get("privatekey"))
+		if err != nil {
+			log.Println("Error base64 decoding string.", err)
+		}
+
+		user.Email = r.Form.Get("email")
+		user.PrivateKey = decoded
+		user.Authorized = r.Form.Get("authorized") == "on"
+
+		env.DB.Save(&user)
+
+		retData["status"] = "ok"
+		retData["user"] = user
+
+		returnJson(w, r, retData, 0)
 	}
 }
