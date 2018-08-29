@@ -213,10 +213,12 @@ func sessionId(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		ctx := context.Background()
 
-		reader, err := env.LogsBucket.Object(vars["id"]).NewReader(ctx)
+		reader, err := env.LogsBucket.Object(vars["id"]).ReadCompressed(true).NewReader(ctx)
 		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
 		} else {
+			w.Header().Set("Content-Encoding", "gzip")
+			w.Header().Set("Transfer-Encoding", "gzip")
 			w.WriteHeader(http.StatusOK)
 			io.Copy(w, reader)
 		}
