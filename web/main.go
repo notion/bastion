@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/pprof"
 )
 
 var (
@@ -52,6 +53,8 @@ func Serve(addr string, env *config.Env) {
 	gob.Register(&config.User{})
 
 	r := mux.NewRouter()
+
+	r.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
 
 	authedRouter := r.PathPrefix("/").Subrouter()
 	authedRouter.Use(authMiddleware)
@@ -244,11 +247,13 @@ func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 		var newSessions []interface{}
 		for k, client := range env.SshProxyClients {
-			sessionData := make(map[string]interface{})
-			sessionData["Name"] = k
-			sessionData["Host"] = client.SshServerClient.ProxyTo
-			sessionData["User"] = client.SshServerClient.User.Email
-			newSessions = append(newSessions, sessionData)
+			if client.SshServerClient.User != nil {
+				sessionData := make(map[string]interface{})
+				sessionData["Name"] = k
+				sessionData["Host"] = client.SshServerClient.ProxyTo
+				sessionData["User"] = client.SshServerClient.User.Email
+				newSessions = append(newSessions, sessionData)
+			}
 		}
 
 		retData["status"] = "ok"

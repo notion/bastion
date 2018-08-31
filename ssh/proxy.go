@@ -67,6 +67,10 @@ func (p *SshConn) serve() error {
 					dst = channel
 				}
 
+				if req == nil || dst == nil {
+					break r
+				}
+
 				log.Printf("Request: %s %s %s %s\n", dst, req.Type, req.WantReply, req.Payload)
 
 				b, err := dst.SendRequest(req.Type, req.WantReply, req.Payload)

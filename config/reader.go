@@ -129,7 +129,11 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 		}
 	}
 
-	lr.Cast.Frames = append(lr.Cast.Frames, newFrame)
+	if len(lr.Cast.Frames) > 20 {
+		lr.Cast.Frames = append(lr.Cast.Frames[1:], newFrame)
+	} else {
+		lr.Cast.Frames = append(lr.Cast.Frames, newFrame)
+	}
 
 	return n, err
 }
