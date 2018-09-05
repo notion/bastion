@@ -9,7 +9,6 @@ import (
 	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/oauth2"
 	"html/template"
-	"log"
 	"net/http"
 	"net/http/pprof"
 )
@@ -64,5 +63,5 @@ func Serve(addr string, env *config.Env) {
 
 	env.Green.Println("Running HTTP server at:", addr)
 
-	log.Fatal(env.Red.Sprint(srv.ListenAndServe()))
+	env.Red.Fatal(srv.ListenAndServe())
 }

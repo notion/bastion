@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"encoding/pem"
 	"github.com/notion/trove_ssh_bastion/config"
-	"log"
 	"syscall"
 	"unsafe"
 )
@@ -15,7 +14,7 @@ import (
 func createPrivateKey(env *config.Env) []byte {
 	pk, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		log.Fatal(env.Red.Sprint(err))
+		env.Red.Fatal(err)
 	}
 
 	env.Blue.Println("Generated RSA Keypair")

@@ -22,7 +22,7 @@ func startProxyServer(addr string, env *config.Env) {
 
 	signer, err := ssh.ParsePrivateKey(pkBytes)
 	if err != nil {
-		log.Fatal(env.Red.Sprint(err))
+		env.Red.Fatal(err)
 	}
 
 	env.Blue.Println("Parsed RSA Keypair")
@@ -106,7 +106,7 @@ func startProxyServer(addr string, env *config.Env) {
 
 	listener, err := net.Listen("unix", addr)
 	if err != nil {
-		log.Fatal(env.Red.Sprint(err))
+		env.Red.Fatal(err)
 	}
 
 	defer listener.Close()

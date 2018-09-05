@@ -6,7 +6,6 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"io"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -27,7 +26,7 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 
 	signer, err := ssh.ParsePrivateKey(pkBytes)
 	if err != nil {
-		log.Fatal(env.Red.Sprint(err))
+		env.Red.Fatal(err)
 	}
 
 	env.Blue.Println("Parsed RSA Keypair")
@@ -38,7 +37,7 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatal(env.Red.Sprint(err))
+		env.Red.Fatal(err)
 	}
 
 	env.Green.Println("Running SSH server at:", addr)

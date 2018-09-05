@@ -47,11 +47,11 @@ type Env struct {
 	Config           *Config
 	LogsBucket       *storage.BucketHandle
 	Vconfig          *viper.Viper
-	Red              *color.Color
-	Green            *color.Color
-	Yellow           *color.Color
-	Blue             *color.Color
-	Magenta          *color.Color
+	Red              *ColorLog
+	Green            *ColorLog
+	Yellow           *ColorLog
+	Blue             *ColorLog
+	Magenta          *ColorLog
 }
 
 type WsClient struct {
@@ -85,11 +85,11 @@ func Load() *Env {
 	vconfig.SetConfigFile(configFile)
 	vconfig.ReadInConfig()
 
-	red := color.New(color.FgRed)
-	green := color.New(color.FgGreen)
-	yellow := color.New(color.FgYellow)
-	blue := color.New(color.FgBlue)
-	magenta := color.New(color.FgMagenta)
+	red := NewColorLog(color.New(color.FgRed))
+	green := NewColorLog(color.New(color.FgGreen))
+	yellow := NewColorLog(color.New(color.FgYellow))
+	blue := NewColorLog(color.New(color.FgBlue))
+	magenta := NewColorLog(color.New(color.FgMagenta))
 
 	db, err := gorm.Open("sqlite3", "trove_ssh_bastion.db")
 	if err != nil {
