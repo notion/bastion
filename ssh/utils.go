@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/pem"
-	"github.com/fatih/color"
 	"github.com/notion/trove_ssh_bastion/config"
 	"log"
 	"syscall"
@@ -16,14 +15,10 @@ import (
 func createPrivateKey(env *config.Env) []byte {
 	pk, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		color.Set(color.FgRed)
-		log.Fatal(err)
-		color.Unset()
+		log.Fatal(env.Red.Sprint(err))
 	}
 
-	color.Set(color.FgBlue)
-	log.Println("Generated RSA Keypair")
-	color.Unset()
+	env.Blue.Println("Generated RSA Keypair")
 
 	pemdata := pem.EncodeToMemory(
 		&pem.Block{

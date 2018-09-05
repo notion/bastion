@@ -7,10 +7,10 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"google.golang.org/api/option"
-	"log"
 	"net"
 	"os"
 	"time"
@@ -46,6 +46,12 @@ type Env struct {
 	DB               *gorm.DB
 	Config           *Config
 	LogsBucket       *storage.BucketHandle
+	Vconfig          *viper.Viper
+	Red              *color.Color
+	Green            *color.Color
+	Yellow           *color.Color
+	Blue             *color.Color
+	Magenta          *color.Color
 }
 
 type WsClient struct {
@@ -71,12 +77,23 @@ type SshProxyClient struct {
 	Closer          *AsciicastReadCloser
 }
 
+var configFile = "config.yml"
+
 func Load() *Env {
+	vconfig := viper.New()
+
+	vconfig.SetConfigFile(configFile)
+	vconfig.ReadInConfig()
+
+	red := color.New(color.FgRed)
+	green := color.New(color.FgGreen)
+	yellow := color.New(color.FgYellow)
+	blue := color.New(color.FgBlue)
+	magenta := color.New(color.FgMagenta)
+
 	db, err := gorm.Open("sqlite3", "trove_ssh_bastion.db")
 	if err != nil {
-		color.Set(color.FgRed)
-		log.Println("Error loading config:", err)
-		color.Unset()
+		red.Println("Error loading config:", err)
 	}
 	db.LogMode(true)
 
@@ -89,7 +106,7 @@ func Load() *Env {
 	ctx := context.Background()
 	storageClient, err := storage.NewClient(ctx, option.WithCredentialsFile(os.Getenv("HOME")+"/Downloads/***REMOVED***-89a4bde34ffb.json"))
 	if err != nil {
-		log.Println("Error initializing google cloud storage", err)
+		red.Println("Error initializing google cloud storage", err)
 	}
 
 	logsBucket := storageClient.Bucket("***REMOVED***")
@@ -101,9 +118,16 @@ func Load() *Env {
 		Config:           &config,
 		DB:               db,
 		LogsBucket:       logsBucket,
+		Vconfig:          vconfig,
+		Red:			  red,
+		Green:			  green,
+		Yellow:			  yellow,
+		Blue:			  blue,
+		Magenta:		  magenta,
 	}
 }
 
 func Save(env *Env) {
 	env.DB.Save(env.Config)
+	env.Vconfig.WriteConfigAs(configFile)
 }

@@ -12,7 +12,7 @@ import (
 var (
 	webAddr      = flag.String("web.addr", ":8080", "The address to listen for http connections on")
 	sshAddr      = flag.String("ssh.addr", ":2222", "The address to listen for ssh connections on")
-	sshProxyAddr = flag.String("ssh.proxy.addr", ":2223", "The address to listen for ssh proxy connections on")
+	sshProxyAddr = flag.String("ssh.proxy.addr", "/tmp/trove_ssh_bastion.sock", "The address to listen for ssh proxy connections on")
 )
 
 func main() {

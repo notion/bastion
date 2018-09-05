@@ -5,12 +5,10 @@ import (
 	"cloud.google.com/go/storage"
 	"compress/gzip"
 	"context"
-	"github.com/fatih/color"
 	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/asciicast"
 	"golang.org/x/crypto/ssh"
 	"io"
-	"log"
 	"time"
 )
 
@@ -45,14 +43,14 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 
 		marshalledHeader, err := closer.Cast.Header.Marshal()
 		if err != nil {
-			log.Println("Error marshalling header", err)
+			env.Red.Println("Error marshalling header", err)
 		}
 
 		marshalledHeader = append(marshalledHeader, []byte("\n")...)
 
 		_, err = closer.GZWriter.Write(marshalledHeader)
 		if err != nil {
-			log.Println("Error writing header to bucket object", err)
+			env.Red.Println("Error writing header to bucket object", err)
 		}
 	}
 
@@ -100,14 +98,14 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 
 	marshalledFrame, err := newFrame.Marshal()
 	if err != nil {
-		log.Println("Error marshalling frame", err)
+		lr.Env.Red.Println("Error marshalling frame", err)
 	}
 
 	marshalledFrame = append(marshalledFrame, []byte("\n")...)
 
 	_, err = lr.GZWriter.Write(marshalledFrame)
 	if err != nil {
-		log.Println("Error writing frame to bucket object", err)
+		lr.Env.Red.Println("Error writing frame to bucket object", err)
 	}
 
 	pathKey := lr.SshConn.RemoteAddr().String()
@@ -118,9 +116,7 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 				wsClient := v.Client
 				wsWriter, err := wsClient.NextWriter(websocket.TextMessage)
 				if err != nil {
-					color.Set(color.FgRed)
-					log.Println("wsWriter error:", err)
-					color.Unset()
+					lr.Env.Red.Println("wsWriter error:", err)
 				} else {
 					wsWriter.Write(readBytes)
 					wsWriter.Close()
@@ -141,7 +137,7 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 func (lr *AsciicastReadCloser) Close() error {
 	data, err := lr.Cast.Marshal()
 	if err != nil {
-		log.Println("Error logging session", err)
+		lr.Env.Red.Println("Error logging session", err)
 	}
 
 	session := &Session{
@@ -160,7 +156,7 @@ func (lr *AsciicastReadCloser) Close() error {
 	err = lr.GZWriter.Close()
 	err = lr.BkWriter.Close()
 	if err != nil {
-		log.Println("Error closing bucket writer", err)
+		lr.Env.Red.Println("Error closing bucket writer", err)
 	}
 
 	return lr.ReadCloser.Close()

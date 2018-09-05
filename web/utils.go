@@ -2,16 +2,13 @@ package web
 
 import (
 	"encoding/json"
-	"github.com/fatih/color"
-	"log"
+	"github.com/notion/trove_ssh_bastion/config"
 	"net/http"
 )
 
-func logHTTP(handler http.Handler) http.Handler {
+func logHTTP(handler http.Handler, env *config.Env) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		color.Set(color.FgYellow)
-		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
-		color.Unset()
+		env.Yellow.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
 
 		handler.ServeHTTP(w, r)
 	})
