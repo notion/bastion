@@ -112,7 +112,7 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 
 						rawProxyConn, err := net.Dial("unix", proxyAddr)
 						if err != nil {
-							env.Red.Println("SOMETHING IS BORKED DUD")
+							env.Red.Println("Unable to establish connection to Unix Socket:", err)
 							closeConn()
 							return
 						}
@@ -120,6 +120,7 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 						env.SshProxyClients[rawProxyConn.LocalAddr().String()] = &config.SshProxyClient{
 							Client:          rawProxyConn,
 							SshServerClient: env.SshServerClients[sshConn.RemoteAddr().String()],
+							SshReqs:         make(map[string][]byte),
 						}
 
 						var once sync.Once
@@ -132,7 +133,7 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 							once.Do(closeConn)
 						}()
 					} else {
-						env.Red.Println("SOMETHING WENT WRONG")
+						env.Red.Println("Unable to find ssh server client.")
 					}
 				}
 			case "auth-agent-req@openssh.com":
@@ -153,13 +154,9 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 
 				if len(keys) > 0 {
 					env.SshServerClients[sshConn.RemoteAddr().String()].PublicKey = keys[0]
-
 					var sessionUser config.User
-
 					env.DB.First(&sessionUser, "private_key = ?", keys[0].Blob)
-
 					env.Yellow.Println(&sessionUser)
-
 					env.SshServerClients[sshConn.RemoteAddr().String()].User = &sessionUser
 				}
 			default:

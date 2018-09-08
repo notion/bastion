@@ -74,6 +74,7 @@ type SshProxyClient struct {
 	SshClient       *ssh.Client
 	SshServerClient *SshServerClient
 	SshShellSession *ssh.Channel
+	SshReqs         map[string][]byte
 	Closer          *AsciicastReadCloser
 }
 

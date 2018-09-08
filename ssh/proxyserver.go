@@ -4,8 +4,6 @@ import (
 	"errors"
 	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/crypto/ssh"
-	"io"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -131,51 +129,15 @@ func startProxyServer(addr string, env *config.Env) {
 			continue
 		}
 
-		sshconn := &SshConn{Conn: tcpConn, config: sshConfig, callbackFn: callbackFn(env), wrapFn: wrapFn(env), closeFn: closeFn(env), env: env}
+		sshconn := &ProxyHandler{Conn: tcpConn, config: sshConfig, env: env}
 
 		go func() {
-			if err := sshconn.serve(); err != nil {
-				env.Red.Printf("Error occured while serving %s\n", err)
-			}
-
-			env.Magenta.Println("Connection closed.")
+			sshconn.Serve()
 
 			delete(env.SshProxyClients, tcpConn.RemoteAddr().String())
 			delete(env.WebsocketClients, tcpConn.RemoteAddr().String())
 		}()
 
 		env.Yellow.Printf("New connection from %s (%s)", tcpConn.RemoteAddr())
-	}
-}
-
-func callbackFn(env *config.Env) func(ssh.ConnMetadata) (*ssh.Client, error) {
-	return func(c ssh.ConnMetadata) (*ssh.Client, error) {
-		var err error
-		meta, ok := env.SshProxyClients[c.RemoteAddr().String()]
-		log.Println(meta, ok, env.SshProxyClients)
-		if !ok {
-			err = errors.New("Callback is bad.")
-			return nil, err
-		}
-
-		env.Yellow.Println(meta)
-
-		client := meta.SshClient
-		env.Yellow.Printf("Connection accepted from: %s", c.RemoteAddr())
-
-		return client, err
-	}
-}
-
-func wrapFn(env *config.Env) func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error) {
-	return func(c ssh.ConnMetadata, r io.ReadCloser) (io.ReadCloser, error) {
-		return config.NewAsciicastReadCloser(r, c, 80, 40, env), nil
-	}
-}
-
-func closeFn(env *config.Env) func(c ssh.ConnMetadata) error {
-	return func(c ssh.ConnMetadata) error {
-		env.Magenta.Println("Connection closed.")
-		return nil
 	}
 }
