@@ -1,6 +1,8 @@
 package ssh
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/crypto/ssh"
@@ -12,24 +14,29 @@ import (
 )
 
 func startServer(addr string, proxyAddr string, env *config.Env) {
+	signer := ParsePrivateKey(env.Config.PrivateKey, env.PKPassphrase, env)
+	userSigner := ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
+
 	sshConfig := &ssh.ServerConfig{
-		NoClientAuth: true,
+		NoClientAuth: false,
+		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
+
+			certcheck := &ssh.CertChecker{
+				IsUserAuthority: func(auth ssh.PublicKey) bool {
+					return bytes.Equal(auth.Marshal(), userSigner.PublicKey().Marshal())
+				},
+			}
+
+			perms, err := certcheck.Authenticate(c, key)
+			if err != nil {
+				env.Red.Println("Unable to verify certificate:", err)
+				return nil, errors.New("Unable to authenticate Key/Token")
+			}
+
+			return perms, nil
+		},
 	}
-
-	var pkBytes []byte
-
-	if len(env.Config.PrivateKey) == 0 {
-		pkBytes = createPrivateKey(env)
-	} else {
-		pkBytes = env.Config.PrivateKey
-	}
-
-	signer, err := ssh.ParsePrivateKey(pkBytes)
-	if err != nil {
-		env.Red.Fatal(err)
-	}
-
-	env.Blue.Println("Parsed RSA Keypair")
 
 	sshConfig.AddHostKey(signer)
 

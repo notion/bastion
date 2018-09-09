@@ -9,10 +9,13 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/config"
+	"github.com/notion/trove_ssh_bastion/ssh"
 	"golang.org/x/oauth2"
 	"io"
 	"io/ioutil"
 	"net/http"
+	cryptossh "golang.org/x/crypto/ssh"
+	"time"
 )
 
 func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *http.Request) {
@@ -255,6 +258,43 @@ func user(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 		retData["status"] = "ok"
 		retData["users"] = users
+
+		returnJson(w, r, retData, 0)
+	}
+}
+
+func userCerts(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		retData := make(map[string]interface{})
+		var user config.User
+
+		env.DB.Find(&user, vars["user_id"])
+		r.ParseForm()
+
+		signer := ssh.ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
+
+		duration, err := time.ParseDuration(env.Config.Expires)
+		if err != nil {
+			env.Red.Println("Unable to parse duration to expire:", err)
+		}
+
+		casigner := ssh.NewCASigner(signer, duration, []string{}, []string{})
+
+		cert, PK, err := casigner.Sign(env, user.Email, nil)
+		if err != nil {
+			env.Red.Println("Unable to sign PrivateKey:", err)
+		}
+
+		marshaled := cryptossh.MarshalAuthorizedKey(cert)
+
+		user.Cert = marshaled[:len(marshaled)-1]
+		user.PrivateKey = PK
+
+		env.DB.Save(&user)
+
+		retData["status"] = "ok"
+		retData["user"] = user
 
 		returnJson(w, r, retData, 0)
 	}

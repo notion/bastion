@@ -18,13 +18,17 @@ import (
 
 type Config struct {
 	gorm.Model
+	Expires string `gorm:"default:'48h'"`
 	PrivateKey []byte
+	UserPrivateKey []byte
+	ServerPrivateKey []byte
 }
 
 type User struct {
 	gorm.Model
 	Email      string `gorm:"type:varchar(255);"`
 	AuthToken  string `gorm:"type:MEDIUMTEXT;"`
+	Cert []byte
 	PrivateKey []byte
 	Authorized bool `gorm:"default:false"`
 }
@@ -40,6 +44,8 @@ type Session struct {
 }
 
 type Env struct {
+	ForceGeneration  bool
+	PKPassphrase     string
 	SshServerClients map[string]*SshServerClient
 	SshProxyClients  map[string]*SshProxyClient
 	WebsocketClients map[string]map[string]*WsClient
@@ -80,7 +86,7 @@ type SshProxyClient struct {
 
 var configFile = "config.yml"
 
-func Load() *Env {
+func Load(forceCerts bool) *Env {
 	vconfig := viper.New()
 
 	vconfig.SetConfigFile(configFile)
@@ -113,6 +119,8 @@ func Load() *Env {
 	logsBucket := storageClient.Bucket("***REMOVED***")
 
 	return &Env{
+		ForceGeneration:  forceCerts,
+		PKPassphrase:     os.Getenv("PKPASSPHRASE"),
 		SshServerClients: make(map[string]*SshServerClient, 0),
 		SshProxyClients:  make(map[string]*SshProxyClient, 0),
 		WebsocketClients: make(map[string]map[string]*WsClient, 0),

@@ -13,12 +13,13 @@ var (
 	webAddr      = flag.String("web.addr", ":8080", "The address to listen for http connections on")
 	sshAddr      = flag.String("ssh.addr", ":2222", "The address to listen for ssh connections on")
 	sshProxyAddr = flag.String("ssh.proxy.addr", "/tmp/trove_ssh_bastion.sock", "The address to listen for ssh proxy connections on")
+	forceCerts   = flag.Bool("ssh.force-certs", false, "Force certificate generation")
 )
 
 func main() {
 	flag.Parse()
 
-	env := config.Load()
+	env := config.Load(*forceCerts)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)

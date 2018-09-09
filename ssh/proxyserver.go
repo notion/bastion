@@ -7,85 +7,51 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"time"
 )
 
 func startProxyServer(addr string, env *config.Env) {
-	var pkBytes []byte
-
-	if len(env.Config.PrivateKey) == 0 {
-		pkBytes = createPrivateKey(env)
-	} else {
-		pkBytes = env.Config.PrivateKey
-	}
-
-	signer, err := ssh.ParsePrivateKey(pkBytes)
-	if err != nil {
-		env.Red.Fatal(err)
-	}
-
-	env.Blue.Println("Parsed RSA Keypair")
+	signer := ParsePrivateKey(env.Config.PrivateKey, env.PKPassphrase, env)
+	serverSigner := ParsePrivateKey(env.Config.ServerPrivateKey, env.PKPassphrase, env)
 
 	sshConfig := &ssh.ServerConfig{
 		NoClientAuth: false,
-		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			env.Yellow.Printf("Login attempt: %s, user %s password: %s", c.RemoteAddr(), c.User(), string(pass))
-
-			if _, ok := env.SshProxyClients[c.RemoteAddr().String()]; ok {
-				clientConfig := &ssh.ClientConfig{
-					HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-						return nil
-					},
-					User: env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.Username,
-					Auth: []ssh.AuthMethod{
-						ssh.Password(string(pass)),
-					},
-				}
-
-				client, err := ssh.Dial("tcp", env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.ProxyTo, clientConfig)
-				if err != nil {
-					env.Red.Println("ERROR IN CALLBACKPW", err)
-					return nil, err
-				}
-
-				env.SshProxyClients[c.RemoteAddr().String()].SshClient = client
-
-				return nil, err
-			}
-
-			return nil, errors.New("can't find initial proxy connection")
-		},
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
 
 			if _, ok := env.SshProxyClients[c.RemoteAddr().String()]; ok {
-				var signers []ssh.Signer
-
-				if env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.Agent != nil {
-					agent := *env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.Agent
-
-					signers, err = agent.Signers()
-					if err != nil {
-						env.Red.Println("Error getting signers", err)
-					}
+				duration, err := time.ParseDuration("1m")
+				if err != nil {
+					env.Red.Println("Unable to parse duration to expire:", err)
 				}
 
-				if signers == nil {
-					signers = []ssh.Signer{signer}
+				casigner := NewCASigner(serverSigner, duration, []string{}, []string{})
+
+				cert, PK, err := casigner.Sign(env, "root", nil)
+				if err != nil {
+					env.Red.Println("Unable to sign PK:", err)
+				}
+
+				signer = ParsePrivateKey(PK, env.PKPassphrase, env)
+
+				certsigner, err := ssh.NewCertSigner(cert, signer)
+				if err != nil {
+					env.Red.Println("Error loading cert signer:", err)
 				}
 
 				clientConfig := &ssh.ClientConfig{
 					HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 						return nil
 					},
-					User: env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.Username,
+					User: "root",
 					Auth: []ssh.AuthMethod{
-						ssh.PublicKeys(signers...),
+						ssh.PublicKeys(certsigner),
 					},
 				}
 
 				client, err := ssh.Dial("tcp", env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.ProxyTo, clientConfig)
 				if err != nil {
-					env.Red.Println("ERROR IN CALLBACKPK", err)
+					env.Red.Println("Error in proxy authentication:", err)
 					return nil, err
 				}
 

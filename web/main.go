@@ -3,7 +3,6 @@ package web
 import (
 	"encoding/gob"
 	"github.com/gorilla/mux"
-	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/config"
@@ -19,7 +18,8 @@ var (
 	}
 
 	storeName = "session"
-	store     = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
+	//store     = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
+	store = sessions.NewCookieStore([]byte("foobar"))
 )
 
 func Serve(addr string, env *config.Env) {
@@ -51,6 +51,7 @@ func Serve(addr string, env *config.Env) {
 
 	authedRouter.HandleFunc("/api/users", user(env))
 	authedRouter.HandleFunc("/api/user/{id}", updateUser(env))
+	authedRouter.HandleFunc("/api/keys/{user_id}", userCerts(env))
 	authedRouter.HandleFunc("/api/livesessions", liveSession(env))
 	authedRouter.HandleFunc("/api/ws/livesessions/{id}", liveSessionWS(env))
 	authedRouter.HandleFunc("/api/sessions", session(env))
