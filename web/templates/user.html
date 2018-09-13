@@ -8,8 +8,9 @@
                 <th>#</th>
                 <th>Email</th>
                 <th>Authorized</th>
-                <th>Public Key</th>
+                <th>Unix User</th>
                 <th>Edit</th>
+                <th>Download Certs</th>
             </tr>
             </thead>
             <tbody>
@@ -47,12 +48,17 @@
                     <input type="email" class="form-control" id="email" placeholder="Email" value="${user.Email}" name="email">
                 </div>
                 <div class="form-group">
-                    <label for="privatekey">Public Key</label>
-                    <input type="password" class="form-control" id="privatekey" placeholder="Private Key" value="${user.PrivateKey}" name="privatekey">
+                    <label for="unixuser">Unix User</label>
+                    <input type="text" class="form-control" id="unixuser" placeholder="Unix User" value="${user.UnixUser}" name="unixuser">
                 </div>
                 <div class="checkbox">
                     <label>
                         <input type="checkbox" ${user.Authorized ? 'checked' : ''} name="authorized"> Authorized
+                    </label>
+                </div>
+                <div class="checkbox">
+                    <label>
+                        <input type="checkbox" name="override"> Override Certificates
                     </label>
                 </div>
                 <button type="submit" class="btn btn-default">Submit</button>
@@ -92,8 +98,9 @@
                             <th>${user.ID}</th>
                             <th>${user.Email}</th>
                             <th><i class="fa ${user.Authorized ? 'fa-check' : 'fa-times'}" style="color: ${user.Authorized ? 'green' : 'red'}"></i></th>
-                            <th><pre style="white-space: pre-wrap">${user.PrivateKey}</pre></th>
+                            <th>${user.UnixUser}</th>
                             <td><button onclick="editUser(${user.ID}, ${elem})" class="btn btn-primary">Edit</button></td>
+                            <td><a href="/api/users/${user.ID}/keys" class="btn btn-primary">Download Keys</a></td>
                         </tr>
                     `);
                 }

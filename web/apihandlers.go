@@ -1,22 +1,28 @@
 package web
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/config"
 	"github.com/notion/trove_ssh_bastion/ssh"
+	cryptossh "golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 	"io"
 	"io/ioutil"
 	"net/http"
-	cryptossh "golang.org/x/crypto/ssh"
 	"time"
 )
+
+var signer cryptossh.Signer
+var casigner *ssh.CASigner
 
 func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -71,13 +77,12 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 
 				var user config.User
 
-				env.DB.First(&user, "email = ?", userData["email"].(string))
+				env.DB.Select([]string{"id", "email", "authorized", "unixuser"}).First(&user, "email = ?", userData["email"].(string))
 
 				user.Email = userData["email"].(string)
 				user.AuthToken = token.AccessToken
 
 				session.Values["user"] = user
-				session.Values["auth"] = token
 				session.Values["loggedin"] = true
 				err = session.Save(r, w)
 				if err != nil {
@@ -302,7 +307,7 @@ func userCerts(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
+		if r.Method != "POST" {
 			http.Redirect(w, r, "/users", http.StatusFound)
 			return
 		}
@@ -314,14 +319,34 @@ func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		env.DB.Find(&user, vars["id"])
 		r.ParseForm()
 
-		decoded, err := base64.StdEncoding.DecodeString(r.Form.Get("privatekey"))
-		if err != nil {
-			env.Red.Println("Error base64 decoding string.", err)
-		}
-
 		user.Email = r.Form.Get("email")
-		user.PrivateKey = decoded
 		user.Authorized = r.Form.Get("authorized") == "on"
+		user.UnixUser = r.Form.Get("unixuser")
+
+		if user.Authorized && user.Cert == nil || r.Form.Get("override") == "on" {
+			if signer == nil {
+				signer = ssh.ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
+			}
+
+			if casigner == nil {
+				duration, err := time.ParseDuration(env.Config.Expires)
+				if err != nil {
+					env.Red.Println("Unable to parse duration to expire:", err)
+				}
+
+				casigner = ssh.NewCASigner(signer, duration, []string{}, []string{})
+			}
+
+			cert, PK, err := casigner.Sign(env, user.Email, nil)
+			if err != nil {
+				env.Red.Println("Unable to sign PrivateKey:", err)
+			}
+
+			marshaled := cryptossh.MarshalAuthorizedKey(cert)
+
+			user.Cert = marshaled[:len(marshaled)-1]
+			user.PrivateKey = PK
+		}
 
 		env.DB.Save(&user)
 
@@ -329,5 +354,63 @@ func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		retData["user"] = user
 
 		returnJson(w, r, retData, 0)
+	}
+}
+
+func downloadKey(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Redirect(w, r, "/users", http.StatusFound)
+			return
+		}
+
+		vars := mux.Vars(r)
+		var user config.User
+
+		if env.DB.Find(&user, vars["id"]).RecordNotFound() || user.Cert == nil {
+			http.Redirect(w, r, "/users", http.StatusFound)
+			return
+		}
+
+		buf := new(bytes.Buffer)
+		writer := zip.NewWriter(buf)
+
+		for _, v := range []string{"id_rsa", "id_rsa.pub", "id_rsa-cert.pub"} {
+			var fileData []byte
+			switch v {
+			case "id_rsa":
+				fileData = user.PrivateKey
+				break
+			case "id_rsa.pub":
+				pk := ssh.ParsePrivateKey(user.PrivateKey, "", env)
+				fileData = cryptossh.MarshalAuthorizedKey(pk.PublicKey())
+				break
+			case "id_rsa-cert.pub":
+				fileData = user.Cert
+				break
+			}
+
+			fileHeader := &zip.FileHeader{
+				Name:               v,
+				UncompressedSize64: uint64(len(fileData)),
+				Modified: time.Now(),
+				Method: zip.Deflate,
+			}
+
+			fileHeader.SetMode(0600)
+
+			fileWriter, err := writer.CreateHeader(fileHeader)
+			if err != nil {
+				env.Red.Println("Unable to write file to zip:", err)
+			}
+
+			fileWriter.Write(fileData)
+		}
+
+		writer.Close()
+
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"authorization.zip\""))
+		w.Write(buf.Bytes())
 	}
 }

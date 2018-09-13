@@ -31,6 +31,7 @@ type User struct {
 	Cert []byte
 	PrivateKey []byte
 	Authorized bool `gorm:"default:false"`
+	UnixUser string `gorm:"type:varchar(255);"`
 }
 
 type Session struct {
