@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/gob"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/config"
@@ -18,8 +19,7 @@ var (
 	}
 
 	storeName = "session"
-	//store     = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
-	store = sessions.NewCookieStore([]byte("foobar"))
+	store     = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
 )
 
 func Serve(addr string, env *config.Env) {
@@ -42,12 +42,14 @@ func Serve(addr string, env *config.Env) {
 	r.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
 
 	authedRouter := r.PathPrefix("/").Subrouter()
-	authedRouter.Use(authMiddleware)
+	authedRouter.Use(authMiddleware(env))
 
 	r.HandleFunc("/", index(env, oauthConfig))
+	r.HandleFunc("/logout", logout(env))
 	authedRouter.HandleFunc("/sessions", sessionTempl(env, templs))
 	authedRouter.HandleFunc("/livesessions", liveSessionTempl(env, templs))
 	authedRouter.HandleFunc("/users", userTempl(env, templs))
+	authedRouter.HandleFunc("/noaccess", noaccessTempl(env, templs))
 
 	authedRouter.HandleFunc("/api/users", user(env))
 	authedRouter.HandleFunc("/api/user/{id}", updateUser(env))

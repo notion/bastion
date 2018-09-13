@@ -76,8 +76,14 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 				}
 
 				var user config.User
+				var userCount int
 
-				env.DB.Select([]string{"id", "email", "authorized", "unixuser"}).First(&user, "email = ?", userData["email"].(string))
+				env.DB.Table("users").Count(&userCount)
+				env.DB.Select([]string{"id", "created_at", "updated_at", "deleted_at", "email", "authorized", "admin", "unix_user"}).First(&user, "email = ?", userData["email"].(string))
+
+				if userCount == 0 {
+					user.Admin = true
+				}
 
 				user.Email = userData["email"].(string)
 				user.AuthToken = token.AccessToken
@@ -98,6 +104,21 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 				return
 			}
 		}
+	}
+}
+
+func logout(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session, err := store.Get(r, "session")
+		if err != nil {
+			env.Red.Println("Can't get session from request", err)
+		}
+
+		session.Values = make(map[interface{}]interface{})
+		session.Save(r, w)
+
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
 	}
 }
 
@@ -153,7 +174,6 @@ func sessionId(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-
 
 func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -227,7 +247,6 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 			_, p, err := c.ReadMessage()
 			if err != nil {
 				env.Red.Println("wsReader error:", err)
-
 				break
 			}
 
@@ -238,7 +257,6 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 					_, err = sshProxyClient.Write(p)
 					if err != nil {
 						env.Red.Println("SSH Session Write Error:", err)
-
 						break
 					}
 				}
@@ -308,6 +326,7 @@ func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 			marshaled := cryptossh.MarshalAuthorizedKey(cert)
 
 			user.Cert = marshaled
+			user.CertExpires = time.Unix(int64(cert.ValidBefore), 0)
 			user.PrivateKey = PK
 		}
 
@@ -327,12 +346,49 @@ func downloadKey(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		session, err := store.Get(r, "session")
+		if err != nil {
+			env.Red.Println("Can't get session from request", err)
+		}
+
+		sessionUser := session.Values["user"].(*config.User)
+
 		vars := mux.Vars(r)
 		var user config.User
 
-		if env.DB.Find(&user, vars["id"]).RecordNotFound() || user.Cert == nil {
+		if env.DB.Find(&user, vars["id"]).RecordNotFound() || user.Cert == nil || (!sessionUser.Admin && sessionUser.ID != user.ID) {
 			http.Redirect(w, r, "/users", http.StatusFound)
 			return
+		}
+
+		if user.Authorized {
+			if signer == nil {
+				signer = ssh.ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
+			}
+
+			if casigner == nil {
+				duration, err := time.ParseDuration(env.Config.Expires)
+				if err != nil {
+					env.Red.Println("Unable to parse duration to expire:", err)
+				}
+
+				casigner = ssh.NewCASigner(signer, duration, []string{}, []string{})
+			}
+
+			if user.Cert != nil || user.CertExpires.Before(time.Now()) {
+				cert, PK, err := casigner.Sign(env, user.Email, nil)
+				if err != nil {
+					env.Red.Println("Unable to sign PrivateKey:", err)
+				}
+
+				marshaled := cryptossh.MarshalAuthorizedKey(cert)
+
+				user.Cert = marshaled
+				user.CertExpires = time.Unix(int64(cert.ValidBefore), 0)
+				user.PrivateKey = PK
+
+				env.DB.Save(&user)
+			}
 		}
 
 		buf := new(bytes.Buffer)
@@ -356,8 +412,8 @@ func downloadKey(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 			fileHeader := &zip.FileHeader{
 				Name:               v,
 				UncompressedSize64: uint64(len(fileData)),
-				Modified: time.Now(),
-				Method: zip.Deflate,
+				Modified:           time.Now(),
+				Method:             zip.Deflate,
 			}
 
 			fileHeader.SetMode(0600)

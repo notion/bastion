@@ -10,7 +10,7 @@ import (
 type ProxyHandler struct {
 	net.Conn
 	config *ssh.ServerConfig
-	env *config.Env
+	env    *config.Env
 }
 
 func (p *ProxyHandler) Serve() {

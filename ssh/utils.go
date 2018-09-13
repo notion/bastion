@@ -24,9 +24,9 @@ var sshPermissions = map[string]string{
 }
 
 type CASigner struct {
-	CA ssh.Signer
-	Validity time.Duration
-	Principals []string
+	CA          ssh.Signer
+	Validity    time.Duration
+	Principals  []string
 	Permissions []string
 }
 
@@ -82,9 +82,9 @@ func (s *CASigner) Sign(env *config.Env, user string, pubKey ssh.PublicKey) (*ss
 
 func NewCASigner(sshsigner ssh.Signer, expireIn time.Duration, principals []string, permissions []string) *CASigner {
 	signer := &CASigner{
-		CA: sshsigner,
-		Validity: expireIn,
-		Principals: principals,
+		CA:          sshsigner,
+		Validity:    expireIn,
+		Principals:  principals,
 		Permissions: permissions,
 	}
 

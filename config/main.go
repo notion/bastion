@@ -18,21 +18,22 @@ import (
 
 type Config struct {
 	gorm.Model
-	Expires string `gorm:"default:'48h'"`
-	PrivateKey []byte
-	UserPrivateKey []byte
+	Expires          string `gorm:"default:'48h'"`
+	PrivateKey       []byte
+	UserPrivateKey   []byte
 	ServerPrivateKey []byte
 }
 
 type User struct {
 	gorm.Model
-	Email      string `gorm:"type:varchar(255);"`
-	AuthToken  string `gorm:"type:MEDIUMTEXT;"`
-	Cert []byte
-	PrivateKey []byte
-	Authorized bool `gorm:"default:false"`
-	Admin bool `gorm:"default:false"`
-	UnixUser string `gorm:"type:varchar(255);"`
+	Email       string `gorm:"type:varchar(255);"`
+	AuthToken   string `gorm:"type:MEDIUMTEXT;"`
+	CertExpires time.Time
+	Cert        []byte
+	PrivateKey  []byte
+	Authorized  bool   `gorm:"default:false"`
+	Admin       bool   `gorm:"default:false"`
+	UnixUser    string `gorm:"type:varchar(255);"`
 }
 
 type Session struct {
@@ -134,11 +135,11 @@ func Load(forceCerts bool) *Env {
 		DB:               db,
 		LogsBucket:       logsBucket,
 		Vconfig:          vconfig,
-		Red:			  red,
-		Green:			  green,
-		Yellow:			  yellow,
-		Blue:			  blue,
-		Magenta:		  magenta,
+		Red:              red,
+		Green:            green,
+		Yellow:           yellow,
+		Blue:             blue,
+		Magenta:          magenta,
 	}
 }
 
