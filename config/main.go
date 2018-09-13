@@ -31,6 +31,7 @@ type User struct {
 	Cert []byte
 	PrivateKey []byte
 	Authorized bool `gorm:"default:false"`
+	Admin bool `gorm:"default:false"`
 	UnixUser string `gorm:"type:varchar(255);"`
 }
 
@@ -110,6 +111,10 @@ func Load(forceCerts bool) *Env {
 	var config Config
 
 	db.First(&config)
+
+	if config.Expires == "" {
+		config.Expires = "48h"
+	}
 
 	ctx := context.Background()
 	storageClient, err := storage.NewClient(ctx, option.WithCredentialsFile(os.Getenv("HOME")+"/Downloads/***REMOVED***-89a4bde34ffb.json"))

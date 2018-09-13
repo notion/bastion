@@ -52,7 +52,6 @@ func Serve(addr string, env *config.Env) {
 	authedRouter.HandleFunc("/api/users", user(env))
 	authedRouter.HandleFunc("/api/user/{id}", updateUser(env))
 	authedRouter.HandleFunc("/api/users/{id}/keys", downloadKey(env))
-	authedRouter.HandleFunc("/api/keys/{user_id}", userCerts(env))
 	authedRouter.HandleFunc("/api/livesessions", liveSession(env))
 	authedRouter.HandleFunc("/api/ws/livesessions/{id}", liveSessionWS(env))
 	authedRouter.HandleFunc("/api/sessions", session(env))

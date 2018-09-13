@@ -34,6 +34,21 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 				return nil, errors.New("Unable to authenticate Key/Token")
 			}
 
+			keyData := ssh.MarshalAuthorizedKey(key)
+			var sessionUser config.User
+
+			if env.DB.First(&sessionUser, "cert = ?", keyData).RecordNotFound() {
+				return nil, errors.New("User cannot be found.")
+			}
+
+			if !sessionUser.Authorized {
+				return nil, errors.New("User is not authorized.")
+			}
+
+			env.SshServerClients[c.RemoteAddr().String()] = &config.SshServerClient{
+				User: &sessionUser,
+			}
+
 			return perms, nil
 		},
 	}
@@ -62,9 +77,7 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 			continue
 		}
 
-		env.SshServerClients[sshConn.RemoteAddr().String()] = &config.SshServerClient{
-			Client: sshConn,
-		}
+		env.SshServerClients[sshConn.RemoteAddr().String()].Client = sshConn
 
 		env.Green.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), sshConn.ClientVersion())
 

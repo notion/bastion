@@ -268,43 +268,6 @@ func user(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func userCerts(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		retData := make(map[string]interface{})
-		var user config.User
-
-		env.DB.Find(&user, vars["user_id"])
-		r.ParseForm()
-
-		signer := ssh.ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
-
-		duration, err := time.ParseDuration(env.Config.Expires)
-		if err != nil {
-			env.Red.Println("Unable to parse duration to expire:", err)
-		}
-
-		casigner := ssh.NewCASigner(signer, duration, []string{}, []string{})
-
-		cert, PK, err := casigner.Sign(env, user.Email, nil)
-		if err != nil {
-			env.Red.Println("Unable to sign PrivateKey:", err)
-		}
-
-		marshaled := cryptossh.MarshalAuthorizedKey(cert)
-
-		user.Cert = marshaled[:len(marshaled)-1]
-		user.PrivateKey = PK
-
-		env.DB.Save(&user)
-
-		retData["status"] = "ok"
-		retData["user"] = user
-
-		returnJson(w, r, retData, 0)
-	}
-}
-
 func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
@@ -344,7 +307,7 @@ func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 			marshaled := cryptossh.MarshalAuthorizedKey(cert)
 
-			user.Cert = marshaled[:len(marshaled)-1]
+			user.Cert = marshaled
 			user.PrivateKey = PK
 		}
 
