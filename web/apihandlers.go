@@ -379,7 +379,7 @@ func downloadKey(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 				casigner = ssh.NewCASigner(signer, duration, []string{}, []string{})
 			}
 
-			if user.Cert != nil || user.CertExpires.Before(time.Now()) {
+			if user.Cert != nil && user.CertExpires.Before(time.Now()) {
 				cert, PK, err := casigner.Sign(env, user.Email, nil)
 				if err != nil {
 					env.Red.Println("Unable to sign PrivateKey:", err)
