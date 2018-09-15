@@ -79,7 +79,7 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 				var userCount int
 
 				env.DB.Table("users").Count(&userCount)
-				env.DB.Select([]string{"id", "created_at", "updated_at", "deleted_at", "email", "authorized", "admin", "unix_user"}).First(&user, "email = ?", userData["email"].(string))
+				env.DB.First(&user, "email = ?", userData["email"].(string))
 
 				if userCount == 0 {
 					user.Admin = true
@@ -87,6 +87,12 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 
 				user.Email = userData["email"].(string)
 				user.AuthToken = token.AccessToken
+				env.DB.Save(&user)
+
+				if user.Cert != nil {
+					user.Cert = []byte{}
+					user.PrivateKey = []byte{}
+				}
 
 				session.Values["user"] = user
 				session.Values["loggedin"] = true
@@ -94,8 +100,6 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 				if err != nil {
 					env.Red.Println("Error saving session:", err)
 				}
-
-				env.DB.Save(&user)
 
 				http.Redirect(w, r, "/sessions", http.StatusFound)
 				return
