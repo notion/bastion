@@ -118,7 +118,7 @@ func Load(forceCerts bool) *Env {
 	}
 
 	ctx := context.Background()
-	storageClient, err := storage.NewClient(ctx, option.WithCredentialsFile(os.Getenv("HOME")+"/Downloads/***REMOVED***-89a4bde34ffb.json"))
+	storageClient, err := storage.NewClient(ctx, option.WithCredentialsFile("credentials.json"))
 	if err != nil {
 		red.Println("Error initializing google cloud storage", err)
 	}

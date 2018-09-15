@@ -2,3 +2,4 @@
 *.db
 *.log
 *.cast
+build/
