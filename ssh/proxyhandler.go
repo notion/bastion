@@ -92,6 +92,8 @@ func (p *ProxyHandler) Serve() {
 				switch req.Type {
 				case "shell":
 					meta.SshShellSessions = append(meta.SshShellSessions, chanInfo)
+				case "exit-status":
+					break r
 				}
 			}
 
