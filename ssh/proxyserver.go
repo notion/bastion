@@ -68,7 +68,7 @@ func startProxyServer(addr string, env *config.Env) {
 
 	env.Blue.Println("Added RSA Keypair to SSH Server")
 
-	listener, err := net.Listen("unix", addr)
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		env.Red.Fatal(err)
 	}

@@ -98,16 +98,29 @@ func (p *ProxyHandler) Serve() {
 		var wrappedClientChannel io.ReadCloser = clientChannel
 		var wrappedProxyChannel = config.NewAsciicastReadCloser(proxyChannel, clientConn, 80, 40, p.env)
 
-		go io.Copy(clientChannel, wrappedProxyChannel)
-		go io.Copy(proxyChannel, wrappedClientChannel)
-
 		closeChans := func() {
 			wrappedClientChannel.Close()
 			wrappedProxyChannel.Close()
+
+			proxyChannel.Close()
+			clientChannel.Close()
 		}
 
-		defer closeChans()
-		defer closeConns()
+		allClose := func() {
+			closeChans()
+			closeConns()
+		}
+
+		go func() {
+			io.Copy(clientChannel, wrappedProxyChannel)
+			allClose()
+		}()
+		go func() {
+			io.Copy(proxyChannel, wrappedClientChannel)
+			allClose()
+		}()
+
+		defer allClose()
 	}
 
 	p.env.Magenta.Println("Closed proxy connection.")

@@ -130,9 +130,9 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 						env.SshServerClients[sshConn.RemoteAddr().String()].Username = sshConn.User()
 						env.SshServerClients[sshConn.RemoteAddr().String()].ProxyTo = host
 
-						rawProxyConn, err := net.Dial("unix", proxyAddr)
+						rawProxyConn, err := net.Dial("tcp", proxyAddr)
 						if err != nil {
-							env.Red.Println("Unable to establish connection to Unix Socket:", err)
+							env.Red.Println("Unable to establish connection to TCP Socket:", err)
 							closeConn()
 							return
 						}

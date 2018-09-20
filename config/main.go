@@ -105,7 +105,7 @@ func Load(forceCerts bool) *Env {
 	if err != nil {
 		red.Println("Error loading config:", err)
 	}
-	db.LogMode(true)
+	db.LogMode(os.Getenv("DEBUG") == "true")
 
 	db.AutoMigrate(&Config{}, &User{}, &Session{})
 

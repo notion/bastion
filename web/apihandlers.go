@@ -185,13 +185,40 @@ func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 		var newSessions []interface{}
 		for k, client := range env.SshProxyClients {
-			if client.SshServerClient.User != nil {
+			if client.SshServerClient.User != nil && client.SshShellSession != nil {
 				sessionData := make(map[string]interface{})
 				sessionData["Name"] = k
 				sessionData["Host"] = client.SshServerClient.ProxyTo
 				sessionData["User"] = client.SshServerClient.User.Email
 				newSessions = append(newSessions, sessionData)
 			}
+		}
+
+		retData["status"] = "ok"
+		retData["livesessions"] = newSessions
+
+		jsonData, err := json.Marshal(retData)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write(jsonData)
+	}
+}
+
+func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		retData := make(map[string]interface{})
+
+		var newSessions []interface{}
+		for k, _ := range env.SshProxyClients {
+			sessionData := make(map[string]interface{})
+
+			sessionData["name"] = k
+
+			newSessions = append(newSessions, sessionData)
 		}
 
 		retData["status"] = "ok"
