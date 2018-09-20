@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 	"io"
 	"net"
 	"strings"
@@ -108,10 +107,12 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 		return
 	}
 
-	closeConn := func() {
+	closeConn := func(rawConn net.Conn) {
 		connection.Close()
+		rawConn.Close()
 
 		delete(env.SshServerClients, sshConn.RemoteAddr().String())
+		delete(env.SshProxyClients, rawConn.RemoteAddr().String())
 		env.Magenta.Printf("Session closed")
 	}
 
@@ -133,51 +134,33 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 						rawProxyConn, err := net.Dial("tcp", proxyAddr)
 						if err != nil {
 							env.Red.Println("Unable to establish connection to TCP Socket:", err)
-							closeConn()
+							closeConn(rawProxyConn)
 							return
 						}
 
 						env.SshProxyClients[rawProxyConn.LocalAddr().String()] = &config.SshProxyClient{
-							Client:          rawProxyConn,
-							SshServerClient: env.SshServerClients[sshConn.RemoteAddr().String()],
-							SshReqs:         make(map[string][]byte),
+							Client:           rawProxyConn,
+							SshServerClient:  env.SshServerClients[sshConn.RemoteAddr().String()],
+							SshChans:         make([]*config.ConnChan, 0),
+							SshShellSessions: make([]*config.ConnChan, 0),
 						}
 
 						var once sync.Once
 						go func() {
 							io.Copy(connection, rawProxyConn)
-							once.Do(closeConn)
+							once.Do(func() {
+								closeConn(rawProxyConn)
+							})
 						}()
 						go func() {
 							io.Copy(rawProxyConn, connection)
-							once.Do(closeConn)
+							once.Do(func() {
+								closeConn(rawProxyConn)
+							})
 						}()
 					} else {
 						env.Red.Println("Unable to find ssh server client.")
 					}
-				}
-			case "auth-agent-req@openssh.com":
-				agentChan, agentReq, err := sshConn.OpenChannel("auth-agent@openssh.com", nil)
-				if err != nil {
-					env.Red.Println("Can't open agent channel")
-				}
-
-				go ssh.DiscardRequests(agentReq)
-
-				loadedAgent := agent.NewClient(agentChan)
-				env.SshServerClients[sshConn.RemoteAddr().String()].Agent = &loadedAgent
-
-				keys, err := loadedAgent.List()
-				if err != nil {
-					env.Red.Println("Error loading key list from agent", err)
-				}
-
-				if len(keys) > 0 {
-					env.SshServerClients[sshConn.RemoteAddr().String()].PublicKey = keys[0]
-					var sessionUser config.User
-					env.DB.First(&sessionUser, "private_key = ?", keys[0].Blob)
-					env.Yellow.Println(&sessionUser)
-					env.SshServerClients[sshConn.RemoteAddr().String()].User = &sessionUser
 				}
 			default:
 				env.Yellow.Println("UNKNOWN TYPE", req.Type)

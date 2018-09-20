@@ -51,7 +51,7 @@
 </div>
 
 <script>
-    function playCast(id) {
+    function playCast(id, sid) {
         if (window.OpenSocket) {
             window.OpenSocket.close();
         }
@@ -61,7 +61,7 @@
             scheme = "wss://";
         }
 
-        var websocket = new WebSocket(scheme + window.location.hostname + ":" + window.location.port + "/api/ws/livesessions/" + id);
+        var websocket = new WebSocket(scheme + window.location.hostname + ":" + window.location.port + "/api/ws/livesessions/" + id + "/" + sid);
         websocket.onopen = function(evt) {
             term = new Terminal({
                 cursorBlink: true,
@@ -80,18 +80,29 @@
     }
 
     $(function() {
+        $('#playModal').on('hidden.bs.modal', function () {
+            window.OpenSocket.close();
+            term.clear();
+        })
+
         $.getJSON('/api/livesessions', function(data) {
             if (data.livesessions) {
                 for (var elem in data.livesessions) {
                     var place = parseInt(elem) + 1;
                     var session = data.livesessions[elem];
+                    var buttons = '';
+
+                    for(var i = 0; i < parseInt(session.Sessions); i++) {
+                        buttons += `<button onclick="playCast('${session.Name}', ${i})" class="btn btn-sm btn-primary">Join ${i}</button>    `;
+                    }
+
                     $("#sessions-table > tbody").append(`
                         <tr>
                             <th>${place}</th>
                             <th>${session.Host}</th>
                             <th>${session.User}</th>
                             <th>${session.Name}</th>
-                            <td><button onclick="playCast('${session.Name}')" class="btn btn-primary">Join</button></td>
+                            <td>${buttons}</td>
                         </tr>
                     `);
                 }

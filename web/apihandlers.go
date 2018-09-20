@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
@@ -18,6 +19,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -185,11 +187,12 @@ func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 		var newSessions []interface{}
 		for k, client := range env.SshProxyClients {
-			if client.SshServerClient.User != nil && client.SshShellSession != nil {
+			if client.SshServerClient.User != nil && len(client.SshShellSessions) > 0 {
 				sessionData := make(map[string]interface{})
 				sessionData["Name"] = k
 				sessionData["Host"] = client.SshServerClient.ProxyTo
 				sessionData["User"] = client.SshServerClient.User.Email
+				sessionData["Sessions"] = len(client.SshShellSessions)
 				newSessions = append(newSessions, sessionData)
 			}
 		}
@@ -213,10 +216,20 @@ func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) 
 		retData := make(map[string]interface{})
 
 		var newSessions []interface{}
-		for k, _ := range env.SshProxyClients {
+		for k, v := range env.SshProxyClients {
 			sessionData := make(map[string]interface{})
-
+			allChans := make([]map[string]interface{}, 0)
 			sessionData["name"] = k
+
+			for _, v2 := range v.SshChans {
+				chanData := make(map[string]interface{})
+				chanData["reqs"] = v2.Reqs
+				chanData["data"] = v2.ChannelData
+				chanData["type"] = v2.ChannelType
+				allChans = append(allChans, chanData)
+			}
+
+			sessionData["chans"] = allChans
 
 			newSessions = append(newSessions, sessionData)
 		}
@@ -224,26 +237,27 @@ func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) 
 		retData["status"] = "ok"
 		retData["livesessions"] = newSessions
 
-		jsonData, err := json.Marshal(retData)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write(jsonData)
+		returnJson(w, r, retData, http.StatusOK)
 	}
 }
 
 func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		pathKey := vars["id"]
+		pathKey, ok := vars["id"]
+		if !ok {
+			returnErr(w, r, errors.New("can't find id"), http.StatusInternalServerError)
+			return
+		}
+		sidKey, ok := vars["sid"]
+		if !ok {
+			sidKey = ""
+		}
 
 		c, err := upgrader.Upgrade(w, r, nil)
 
 		env.Blue.Println("New WebSocket Connection From:", r.RemoteAddr)
-		env.Blue.Println("Path:", pathKey)
+		env.Blue.Println("Path:", pathKey, sidKey)
 
 		if err != nil {
 			env.Red.Println("Upgrade error:", err)
@@ -251,26 +265,37 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 		}
 
 		if proxyClient, ok := env.SshProxyClients[pathKey]; ok {
-			if _, ok := env.WebsocketClients[pathKey]; !ok {
-				env.WebsocketClients[pathKey] = make(map[string]*config.WsClient)
+			place := 0
+			if sidKey != "" {
+				place, err = strconv.Atoi(sidKey)
 			}
 
-			env.WebsocketClients[pathKey][c.RemoteAddr().String()] = &config.WsClient{
-				Client: c,
+			if place < len(proxyClient.SshShellSessions) {
+				if _, ok := env.WebsocketClients[pathKey+sidKey]; !ok {
+					env.WebsocketClients[pathKey+sidKey] = make(map[string]*config.WsClient)
+				}
+
+				chanInfo := proxyClient.SshShellSessions[place]
+
+				env.WebsocketClients[pathKey+sidKey][c.RemoteAddr().String()] = &config.WsClient{
+					Client: c,
+				}
+
+				wsWriter, err := c.NextWriter(websocket.TextMessage)
+				if err != nil {
+					env.Red.Println("Error establishing ws writer in playback")
+				}
+
+				for _, frame := range chanInfo.Closer.Cast.Frames {
+					wsWriter.Write([]byte(frame.Data))
+				}
+
+				wsWriter.Close()
+			} else {
+				return
 			}
 
-			wsWriter, err := c.NextWriter(websocket.TextMessage)
-			if err != nil {
-				env.Red.Println("Error establishing ws writer in playback")
-			}
-
-			for _, frame := range proxyClient.Closer.Cast.Frames {
-				wsWriter.Write([]byte(frame.Data))
-			}
-
-			wsWriter.Close()
 		} else {
-			c.Close()
 			return
 		}
 
@@ -282,21 +307,30 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 			}
 
 			if _, ok := env.SshProxyClients[pathKey]; ok {
-				sshProxyClient := *env.SshProxyClients[pathKey].SshShellSession
+				place := 0
+				if sidKey != "" {
+					place, err = strconv.Atoi(sidKey)
+				}
 
-				if sshProxyClient != nil {
-					_, err = sshProxyClient.Write(p)
-					if err != nil {
-						env.Red.Println("SSH Session Write Error:", err)
-						break
+				if place < len(env.SshProxyClients[pathKey].SshShellSessions) {
+					sshProxyClient := *env.SshProxyClients[pathKey].SshShellSessions[place].ProxyChan
+
+					if sshProxyClient != nil {
+						_, err = sshProxyClient.Write(p)
+						if err != nil {
+							env.Red.Println("SSH Session Write Error:", err)
+							break
+						}
 					}
+				} else {
+					return
 				}
 			}
 		}
 
 		defer func() {
 			c.Close()
-			delete(env.WebsocketClients[pathKey], c.RemoteAddr().String())
+			delete(env.WebsocketClients[pathKey+sidKey], c.RemoteAddr().String())
 
 			env.Magenta.Println("Closed WebSocket Connection From:", r.RemoteAddr)
 		}()

@@ -9,10 +9,11 @@ import (
 	"github.com/notion/trove_ssh_bastion/asciicast"
 	"golang.org/x/crypto/ssh"
 	"io"
+	"strconv"
 	"time"
 )
 
-func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, height int, env *Env) io.ReadCloser {
+func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, height int, chanInfo *ConnChan, env *Env) io.ReadCloser {
 	closer := &AsciicastReadCloser{
 		ReadCloser: r,
 		SshConn:    conn,
@@ -55,7 +56,8 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 	}
 
 	if client, ok := env.SshProxyClients[conn.RemoteAddr().String()]; ok {
-		env.SshProxyClients[conn.RemoteAddr().String()].Closer = closer
+		chanInfo.Closer = closer
+		closer.SidKey = strconv.Itoa(len(client.SshShellSessions))
 		closer.User = client.SshServerClient.User
 		closer.Host = client.SshServerClient.ProxyTo
 	}
@@ -76,6 +78,7 @@ type AsciicastReadCloser struct {
 	GZWriter  *gzip.Writer
 	User      *User
 	Host      string
+	SidKey    string
 }
 
 func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
@@ -109,10 +112,11 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 	}
 
 	pathKey := lr.SshConn.RemoteAddr().String()
+	sidKey := lr.SidKey
 
 	if _, ok := lr.Env.SshProxyClients[pathKey]; ok {
-		if _, ok := lr.Env.WebsocketClients[pathKey]; ok {
-			for _, v := range lr.Env.WebsocketClients[pathKey] {
+		if _, ok := lr.Env.WebsocketClients[pathKey+sidKey]; ok {
+			for _, v := range lr.Env.WebsocketClients[pathKey+sidKey] {
 				wsClient := v.Client
 				wsWriter, err := wsClient.NextWriter(websocket.TextMessage)
 				if err != nil {

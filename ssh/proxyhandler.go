@@ -5,6 +5,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
+	"sync"
 )
 
 type ProxyHandler struct {
@@ -43,10 +44,16 @@ func (p *ProxyHandler) Serve() {
 			return
 		}
 
-		closeConns := func() {
-			clientConn.Close()
-			proxyConn.Close()
+		chanInfo := &config.ConnChan{
+			ChannelType: openedChannel.ChannelType(),
+			ChannelData: openedChannel.ExtraData(),
+			Reqs: make([]*config.ConnReq, 0),
+			ClientConn: clientConn,
+			ProxyConn: proxyConn,
+			ProxyChan: &proxyChannel,
+			ClientChan: &clientChannel,
 		}
+		meta.SshChans = append(meta.SshChans, chanInfo)
 
 		go func() {
 
@@ -75,28 +82,25 @@ func (p *ProxyHandler) Serve() {
 					req.Reply(b, nil)
 				}
 
-				if proxClient, ok := p.env.SshProxyClients[p.RemoteAddr().String()]; ok {
-					proxClient.SshReqs[req.Type] = req.Payload
+				reqInfo := &config.ConnReq{
+					ReqType: req.Type,
+					ReqData: req.Payload,
+					ReqReply: req.WantReply,
 				}
+				chanInfo.Reqs = append(chanInfo.Reqs, reqInfo)
 
 				switch req.Type {
-				case "exit-status":
-					break r
 				case "shell":
-					if proxClient, ok := p.env.SshProxyClients[p.RemoteAddr().String()]; ok {
-						proxClient.SshShellSession = &dst
-					}
+					meta.SshShellSessions = append(meta.SshShellSessions, chanInfo)
 				}
 			}
 
 			proxyChannel.Close()
 			clientChannel.Close()
-
-			defer closeConns()
 		}()
 
 		var wrappedClientChannel io.ReadCloser = clientChannel
-		var wrappedProxyChannel = config.NewAsciicastReadCloser(proxyChannel, clientConn, 80, 40, p.env)
+		var wrappedProxyChannel = config.NewAsciicastReadCloser(proxyChannel, clientConn, 80, 40, chanInfo, p.env)
 
 		closeChans := func() {
 			wrappedClientChannel.Close()
@@ -108,19 +112,19 @@ func (p *ProxyHandler) Serve() {
 
 		allClose := func() {
 			closeChans()
-			closeConns()
 		}
 
+		var once sync.Once
 		go func() {
 			io.Copy(clientChannel, wrappedProxyChannel)
-			allClose()
+			once.Do(allClose)
 		}()
 		go func() {
 			io.Copy(proxyChannel, wrappedClientChannel)
-			allClose()
+			once.Do(allClose)
 		}()
 
-		defer allClose()
+		defer once.Do(allClose)
 	}
 
 	p.env.Magenta.Println("Closed proxy connection.")

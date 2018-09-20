@@ -82,9 +82,26 @@ type SshProxyClient struct {
 	Client          net.Conn
 	SshClient       *ssh.Client
 	SshServerClient *SshServerClient
-	SshShellSession *ssh.Channel
-	SshReqs         map[string][]byte
+	SshShellSessions []*ConnChan
+	SshChans        []*ConnChan
 	Closer          *AsciicastReadCloser
+}
+
+type ConnReq struct {
+	ReqType string
+	ReqData []byte
+	ReqReply bool
+}
+
+type ConnChan struct {
+	ChannelType string
+	ChannelData []byte
+	Reqs []*ConnReq
+	ClientConn *ssh.ServerConn
+	ProxyConn *ssh.Client
+	ProxyChan *ssh.Channel
+	ClientChan *ssh.Channel
+	Closer *AsciicastReadCloser
 }
 
 var configFile = "config.yml"
