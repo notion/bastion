@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 type ProxyHandler struct {
@@ -119,10 +120,14 @@ func (p *ProxyHandler) Serve() {
 		var once sync.Once
 		go func() {
 			io.Copy(clientChannel, wrappedProxyChannel)
+			timer := time.NewTimer(1 * time.Second)
+			<-timer.C
 			once.Do(allClose)
 		}()
 		go func() {
 			io.Copy(proxyChannel, wrappedClientChannel)
+			timer := time.NewTimer(1 * time.Second)
+			<-timer.C
 			once.Do(allClose)
 		}()
 
