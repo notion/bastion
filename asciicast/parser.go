@@ -25,9 +25,10 @@ type Header struct {
 }
 
 type Frame struct {
-	Time  float64
-	Event string
-	Data  string
+	Time   float64
+	Event  string
+	Data   string
+	Author string
 }
 
 func (frame *Frame) Marshal() ([]byte, error) {
@@ -36,6 +37,7 @@ func (frame *Frame) Marshal() ([]byte, error) {
 	frameData[0] = frame.Time
 	frameData[1] = frame.Event
 	frameData[2] = frame.Data
+	frameData[3] = frame.Author
 
 	return json.Marshal(frameData)
 }
@@ -91,9 +93,10 @@ func UnmarshalCast(data string) (*Cast, error) {
 		}
 
 		frameStruct := &Frame{
-			Time:  frameSlice[0].(float64),
-			Event: frameSlice[1].(string),
-			Data:  frameSlice[2].(string),
+			Time:   frameSlice[0].(float64),
+			Event:  frameSlice[1].(string),
+			Data:   frameSlice[2].(string),
+			Author: frameSlice[3].(string),
 		}
 
 		cast.Frames = append(cast.Frames, frameStruct)

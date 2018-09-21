@@ -79,29 +79,29 @@ type SshServerClient struct {
 }
 
 type SshProxyClient struct {
-	Client          net.Conn
-	SshClient       *ssh.Client
-	SshServerClient *SshServerClient
+	Client           net.Conn
+	SshClient        *ssh.Client
+	SshServerClient  *SshServerClient
 	SshShellSessions []*ConnChan
-	SshChans        []*ConnChan
-	Closer          *AsciicastReadCloser
+	SshChans         []*ConnChan
+	Closer           *AsciicastReadCloser
 }
 
 type ConnReq struct {
-	ReqType string
-	ReqData []byte
+	ReqType  string
+	ReqData  []byte
 	ReqReply bool
 }
 
 type ConnChan struct {
 	ChannelType string
 	ChannelData []byte
-	Reqs []*ConnReq
-	ClientConn *ssh.ServerConn
-	ProxyConn *ssh.Client
-	ProxyChan *ssh.Channel
-	ClientChan *ssh.Channel
-	Closer *AsciicastReadCloser
+	Reqs        []*ConnReq
+	ClientConn  *ssh.ServerConn
+	ProxyConn   *ssh.Client
+	ProxyChan   *ssh.Channel
+	ClientChan  *ssh.Channel
+	Closer      *AsciicastReadCloser
 }
 
 var configFile = "config.yml"

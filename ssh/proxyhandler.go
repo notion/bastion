@@ -48,11 +48,11 @@ func (p *ProxyHandler) Serve() {
 		chanInfo := &config.ConnChan{
 			ChannelType: openedChannel.ChannelType(),
 			ChannelData: openedChannel.ExtraData(),
-			Reqs: make([]*config.ConnReq, 0),
-			ClientConn: clientConn,
-			ProxyConn: proxyConn,
-			ProxyChan: &proxyChannel,
-			ClientChan: &clientChannel,
+			Reqs:        make([]*config.ConnReq, 0),
+			ClientConn:  clientConn,
+			ProxyConn:   proxyConn,
+			ProxyChan:   &proxyChannel,
+			ClientChan:  &clientChannel,
 		}
 		meta.SshChans = append(meta.SshChans, chanInfo)
 
@@ -84,8 +84,8 @@ func (p *ProxyHandler) Serve() {
 				}
 
 				reqInfo := &config.ConnReq{
-					ReqType: req.Type,
-					ReqData: req.Payload,
+					ReqType:  req.Type,
+					ReqData:  req.Payload,
 					ReqReply: req.WantReply,
 				}
 				chanInfo.Reqs = append(chanInfo.Reqs, reqInfo)

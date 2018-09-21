@@ -94,9 +94,10 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 	}
 
 	newFrame := &asciicast.Frame{
-		Time:  duration,
-		Event: "o",
-		Data:  string(readBytes),
+		Time:   duration,
+		Event:  "o",
+		Data:   string(readBytes),
+		Author: lr.User.Email,
 	}
 
 	marshalledFrame, err := newFrame.Marshal()
