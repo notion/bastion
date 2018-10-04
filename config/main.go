@@ -23,18 +23,20 @@ type Config struct {
 	PrivateKey       []byte
 	UserPrivateKey   []byte
 	ServerPrivateKey []byte
+	DefaultHosts     string `gorm:"type:MEDIUMTEXT;"`
 }
 
 type User struct {
 	gorm.Model
-	Email       string `gorm:"type:varchar(255);"`
-	AuthToken   string `gorm:"type:MEDIUMTEXT;"`
-	CertExpires time.Time
-	Cert        []byte
-	PrivateKey  []byte
-	Authorized  bool   `gorm:"default:false"`
-	Admin       bool   `gorm:"default:false"`
-	UnixUser    string `gorm:"type:varchar(255);"`
+	Email           string `gorm:"type:varchar(255);"`
+	AuthToken       string `gorm:"type:MEDIUMTEXT;"`
+	CertExpires     time.Time
+	Cert            []byte
+	PrivateKey      []byte
+	Authorized      bool   `gorm:"default:false"`
+	AuthorizedHosts string `gorm:"type:MEDIUMTEXT;"`
+	Admin           bool   `gorm:"default:false"`
+	UnixUser        string `gorm:"type:varchar(255);"`
 }
 
 type Session struct {

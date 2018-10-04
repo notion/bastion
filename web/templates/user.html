@@ -7,7 +7,9 @@
             <tr id="table-head-row-1">
                 <th>#</th>
                 <th>Email</th>
+                <th>Admin</th>
                 <th>Authorized</th>
+                <th>Authorized Hosts</th>
                 <th>Unix User</th>
                 <th>Edit</th>
                 <th>Download Certs</th>
@@ -48,12 +50,21 @@
                     <input type="email" class="form-control" id="email" placeholder="Email" value="${user.Email}" name="email">
                 </div>
                 <div class="form-group">
+                    <label for="unixuser">Authorized Hosts</label>
+                    <input type="text" class="form-control" id="authorizedhosts" placeholder="Unix User" value="${user.AuthorizedHosts}" name="authorizedhosts">
+                </div>
+                <div class="form-group">
                     <label for="unixuser">Unix User</label>
                     <input type="text" class="form-control" id="unixuser" placeholder="Unix User" value="${user.UnixUser}" name="unixuser">
                 </div>
                 <div class="checkbox">
                     <label>
                         <input type="checkbox" ${user.Authorized ? 'checked' : ''} name="authorized"> Authorized
+                    </label>
+                </div>
+                <div class="checkbox">
+                    <label>
+                        <input type="checkbox" ${user.Admin ? 'checked' : ''} name="admin"> Admin
                     </label>
                 </div>
                 <div class="checkbox">
@@ -97,7 +108,9 @@
                         <tr>
                             <th>${user.ID}</th>
                             <th>${user.Email}</th>
+                            <th><i class="fa ${user.Admin ? 'fa-check' : 'fa-times'}" style="color: ${user.Admin ? 'green' : 'red'}"></i></th>
                             <th><i class="fa ${user.Authorized ? 'fa-check' : 'fa-times'}" style="color: ${user.Authorized ? 'green' : 'red'}"></i></th>
+                            <th>${user.AuthorizedHosts}</th>
                             <th>${user.UnixUser}</th>
                             <td><button onclick="editUser(${user.ID}, ${elem})" class="btn btn-primary">Edit</button></td>
                             <td><a href="/api/users/${user.ID}/keys" class="btn btn-primary">Download Keys</a></td>

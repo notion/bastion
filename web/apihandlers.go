@@ -89,6 +89,7 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 
 				user.Email = userData["email"].(string)
 				user.AuthToken = token.AccessToken
+				user.AuthorizedHosts = env.Config.DefaultHosts
 				env.DB.Save(&user)
 
 				if user.Cert != nil {
@@ -394,6 +395,8 @@ func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 		user.Email = r.Form.Get("email")
 		user.Authorized = r.Form.Get("authorized") == "on"
+		user.Admin = r.Form.Get("admin") == "on"
+		user.AuthorizedHosts = r.Form.Get("authorizedhosts")
 		user.UnixUser = r.Form.Get("unixuser")
 
 		if user.Authorized && user.Cert == nil || r.Form.Get("override") == "on" {

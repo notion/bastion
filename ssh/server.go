@@ -8,6 +8,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -112,10 +113,13 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 
 	closeConn := func(rawConn net.Conn) {
 		connection.Close()
-		rawConn.Close()
+
+		if rawConn != nil {
+			rawConn.Close()
+			env.SshProxyClients.Delete(rawConn.RemoteAddr().String())
+		}
 
 		env.SshServerClients.Delete(sshConn.RemoteAddr().String())
-		env.SshProxyClients.Delete(rawConn.RemoteAddr().String())
 		env.Magenta.Printf("Session closed")
 	}
 
@@ -132,6 +136,22 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 
 					if serverClientInterface, ok := env.SshServerClients.Load(sshConn.RemoteAddr().String()); ok {
 						serverClient := serverClientInterface.(*config.SshServerClient)
+
+						if serverClient.User.AuthorizedHosts != "" {
+							regexMatch, err := regexp.MatchString(serverClient.User.AuthorizedHosts, host)
+							if err != nil {
+								env.Red.Println("Unable to match regex for host:", err)
+							}
+
+							if !regexMatch {
+								closeConn(nil)
+								return
+							}
+						} else {
+							closeConn(nil)
+							return
+						}
+
 						serverClient.Username = sshConn.User()
 						serverClient.ProxyTo = host
 

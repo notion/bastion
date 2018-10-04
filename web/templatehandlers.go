@@ -3,7 +3,6 @@ package web
 import (
 	"github.com/notion/trove_ssh_bastion/config"
 	"html/template"
-	"log"
 	"net/http"
 )
 
@@ -54,8 +53,6 @@ func noaccessTempl(env *config.Env, templs *template.Template) func(w http.Respo
 		}
 
 		userData := session.Values["user"].(*config.User)
-		log.Printf("%+v", userData)
-		log.Printf("%+v", session.Values)
 
 		var fullUser config.User
 

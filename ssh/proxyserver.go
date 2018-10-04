@@ -1,12 +1,15 @@
 package ssh
 
 import (
+	"bytes"
 	"errors"
 	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/crypto/ssh"
 	"net"
 	"os"
 	"os/signal"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -57,7 +60,34 @@ func startProxyServer(addr string, env *config.Env) {
 					return nil, err
 				}
 
-				proxyClient.SshClient = client
+				session, _ := client.NewSession()
+				defer session.Close()
+				defer client.Close()
+
+				var stdoutBuf bytes.Buffer
+				session.Stdout = &stdoutBuf
+				session.Run("hostname")
+
+				if proxyClient.SshServerClient.User.AuthorizedHosts != "" {
+					regexMatch, err := regexp.MatchString(proxyClient.SshServerClient.User.AuthorizedHosts, strings.TrimSpace(stdoutBuf.String()))
+					if err != nil {
+						env.Red.Println("Unable to match regex for host:", err)
+					}
+
+					if !regexMatch {
+						return nil, errors.New("can't find initial proxy connection")
+					}
+				} else {
+					return nil, errors.New("can't find initial proxy connection")
+				}
+
+				realClient, err := ssh.Dial("tcp", proxyClient.SshServerClient.ProxyTo, clientConfig)
+				if err != nil {
+					env.Red.Println("Error in proxy authentication:", err)
+					return nil, err
+				}
+
+				proxyClient.SshClient = realClient
 
 				return nil, err
 			}
