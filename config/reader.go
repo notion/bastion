@@ -10,6 +10,8 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -26,7 +28,8 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 				Timestamp: time.Now().Unix(),
 			},
 		},
-		Env: env,
+		Env:   env,
+		Mutex: &sync.Mutex{},
 	}
 
 	if env.LogsBucket != nil {
@@ -71,17 +74,19 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 type AsciicastReadCloser struct {
 	io.ReadCloser
 
-	SshConn   ssh.ConnMetadata
-	Cast      *asciicast.Cast
-	Time      time.Time
-	Buffer    bytes.Buffer
-	Env       *Env
-	BkWriter  *storage.Writer
-	BkContext context.Context
-	GZWriter  *gzip.Writer
-	User      *User
-	Host      string
-	SidKey    string
+	SshConn     ssh.ConnMetadata
+	Cast        *asciicast.Cast
+	Time        time.Time
+	Buffer      bytes.Buffer
+	Env         *Env
+	BkWriter    *storage.Writer
+	BkContext   context.Context
+	GZWriter    *gzip.Writer
+	User        *User
+	Host        string
+	SidKey      string
+	CurrentUser string
+	Mutex       *sync.Mutex
 }
 
 func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
@@ -96,11 +101,25 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 		return n, err
 	}
 
+	lr.Mutex.Lock()
+	currentUser := lr.CurrentUser
+	lr.Mutex.Unlock()
+
+	if currentUser == "" {
+		currentUser = lr.User.Email
+	}
+
 	newFrame := &asciicast.Frame{
 		Time:   duration,
 		Event:  "o",
 		Data:   string(readBytes),
-		Author: lr.User.Email,
+		Author: currentUser,
+	}
+
+	if currentUser != "" && strings.HasSuffix(string(readBytes), ":~# ") {
+		lr.Mutex.Lock()
+		lr.CurrentUser = ""
+		lr.Mutex.Unlock()
 	}
 
 	marshalledFrame, err := newFrame.Marshal()

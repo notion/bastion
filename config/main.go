@@ -85,7 +85,6 @@ type SshProxyClient struct {
 	SshServerClient  *SshServerClient
 	SshShellSessions []*ConnChan
 	SshChans         []*ConnChan
-	Closer           *AsciicastReadCloser
 	Mutex            *sync.Mutex
 }
 

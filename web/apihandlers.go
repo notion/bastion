@@ -253,6 +253,13 @@ func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) 
 
 func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		session, err := store.Get(r, "session")
+		if err != nil {
+			env.Red.Println("Can't get session from request", err)
+		}
+
+		userData := session.Values["user"].(*config.User)
+
 		vars := mux.Vars(r)
 		pathKey, ok := vars["id"]
 		if !ok {
@@ -286,7 +293,6 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 
 				proxyClient.Mutex.Lock()
 				clientMap := clientMapInterface.(map[string]*config.WsClient)
-				proxyClient.Mutex.Unlock()
 
 				chanInfo := proxyClient.SshShellSessions[place]
 
@@ -304,6 +310,7 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 				}
 
 				wsWriter.Close()
+				proxyClient.Mutex.Unlock()
 			} else {
 				return
 			}
@@ -330,7 +337,11 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 					sshProxyClient := *proxyClient.SshShellSessions[place].ProxyChan
 
 					if sshProxyClient != nil {
+						proxyClient.SshShellSessions[place].Closer.Mutex.Lock()
+						proxyClient.SshShellSessions[place].Closer.CurrentUser = userData.Email
+						proxyClient.SshShellSessions[place].Closer.Mutex.Unlock()
 						_, err = sshProxyClient.Write(p)
+
 						if err != nil {
 							env.Red.Println("SSH Session Write Error:", err)
 							break
