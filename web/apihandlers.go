@@ -186,16 +186,22 @@ func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		retData := make(map[string]interface{})
 
 		var newSessions []interface{}
-		for k, client := range env.SshProxyClients {
+		env.SshProxyClients.Range(func(key interface{}, value interface{}) bool {
+			client := value.(*config.SshProxyClient)
+
+			client.Mutex.Lock()
 			if client.SshServerClient.User != nil && len(client.SshShellSessions) > 0 {
 				sessionData := make(map[string]interface{})
-				sessionData["Name"] = k
+				sessionData["Name"] = key.(string)
 				sessionData["Host"] = client.SshServerClient.ProxyTo
 				sessionData["User"] = client.SshServerClient.User.Email
 				sessionData["Sessions"] = len(client.SshShellSessions)
 				newSessions = append(newSessions, sessionData)
 			}
-		}
+			client.Mutex.Unlock()
+
+			return true
+		})
 
 		retData["status"] = "ok"
 		retData["livesessions"] = newSessions
@@ -216,12 +222,14 @@ func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) 
 		retData := make(map[string]interface{})
 
 		var newSessions []interface{}
-		for k, v := range env.SshProxyClients {
+		env.SshProxyClients.Range(func(key interface{}, value interface{}) bool {
+			client := value.(*config.SshProxyClient)
+
 			sessionData := make(map[string]interface{})
 			allChans := make([]map[string]interface{}, 0)
-			sessionData["name"] = k
+			sessionData["name"] = key.(string)
 
-			for _, v2 := range v.SshChans {
+			for _, v2 := range client.SshChans {
 				chanData := make(map[string]interface{})
 				chanData["reqs"] = v2.Reqs
 				chanData["data"] = v2.ChannelData
@@ -232,7 +240,9 @@ func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) 
 			sessionData["chans"] = allChans
 
 			newSessions = append(newSessions, sessionData)
-		}
+
+			return true
+		})
 
 		retData["status"] = "ok"
 		retData["livesessions"] = newSessions
@@ -264,20 +274,23 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		if proxyClient, ok := env.SshProxyClients[pathKey]; ok {
+		if proxyClientInterface, ok := env.SshProxyClients.Load(pathKey); ok {
+			proxyClient := proxyClientInterface.(*config.SshProxyClient)
 			place := 0
 			if sidKey != "" {
 				place, err = strconv.Atoi(sidKey)
 			}
 
 			if place < len(proxyClient.SshShellSessions) {
-				if _, ok := env.WebsocketClients[pathKey+sidKey]; !ok {
-					env.WebsocketClients[pathKey+sidKey] = make(map[string]*config.WsClient)
-				}
+				clientMapInterface, _ := env.WebsocketClients.LoadOrStore(pathKey+sidKey, make(map[string]*config.WsClient))
+
+				proxyClient.Mutex.Lock()
+				clientMap := clientMapInterface.(map[string]*config.WsClient)
+				proxyClient.Mutex.Unlock()
 
 				chanInfo := proxyClient.SshShellSessions[place]
 
-				env.WebsocketClients[pathKey+sidKey][c.RemoteAddr().String()] = &config.WsClient{
+				clientMap[c.RemoteAddr().String()] = &config.WsClient{
 					Client: c,
 				}
 
@@ -306,14 +319,15 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 				break
 			}
 
-			if _, ok := env.SshProxyClients[pathKey]; ok {
+			if proxyClientInterface, ok := env.SshProxyClients.Load(pathKey); ok {
+				proxyClient := proxyClientInterface.(*config.SshProxyClient)
 				place := 0
 				if sidKey != "" {
 					place, err = strconv.Atoi(sidKey)
 				}
 
-				if place < len(env.SshProxyClients[pathKey].SshShellSessions) {
-					sshProxyClient := *env.SshProxyClients[pathKey].SshShellSessions[place].ProxyChan
+				if place < len(proxyClient.SshShellSessions) {
+					sshProxyClient := *proxyClient.SshShellSessions[place].ProxyChan
 
 					if sshProxyClient != nil {
 						_, err = sshProxyClient.Write(p)
@@ -330,7 +344,9 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 
 		defer func() {
 			c.Close()
-			delete(env.WebsocketClients[pathKey+sidKey], c.RemoteAddr().String())
+			clientInterface, _ := env.WebsocketClients.Load(pathKey + sidKey)
+			client := clientInterface.(map[string]*config.WsClient)
+			delete(client, c.RemoteAddr().String())
 
 			env.Magenta.Println("Closed WebSocket Connection From:", r.RemoteAddr)
 		}()

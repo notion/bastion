@@ -13,6 +13,7 @@ import (
 	"google.golang.org/api/option"
 	"net"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -49,9 +50,9 @@ type Session struct {
 type Env struct {
 	ForceGeneration  bool
 	PKPassphrase     string
-	SshServerClients map[string]*SshServerClient
-	SshProxyClients  map[string]*SshProxyClient
-	WebsocketClients map[string]map[string]*WsClient
+	SshServerClients *sync.Map
+	SshProxyClients  *sync.Map
+	WebsocketClients *sync.Map
 	DB               *gorm.DB
 	Config           *Config
 	LogsBucket       *storage.BucketHandle
@@ -85,6 +86,7 @@ type SshProxyClient struct {
 	SshShellSessions []*ConnChan
 	SshChans         []*ConnChan
 	Closer           *AsciicastReadCloser
+	Mutex            *sync.Mutex
 }
 
 type ConnReq struct {
@@ -140,14 +142,18 @@ func Load(forceCerts bool) *Env {
 		red.Println("Error initializing google cloud storage", err)
 	}
 
-	logsBucket := storageClient.Bucket("***REMOVED***")
+	bucketName := os.Getenv("BUCKET_NAME")
+	if bucketName == "" {
+		bucketName = "***REMOVED***"
+	}
+	logsBucket := storageClient.Bucket(bucketName)
 
 	return &Env{
 		ForceGeneration:  forceCerts,
 		PKPassphrase:     os.Getenv("PKPASSPHRASE"),
-		SshServerClients: make(map[string]*SshServerClient, 0),
-		SshProxyClients:  make(map[string]*SshProxyClient, 0),
-		WebsocketClients: make(map[string]map[string]*WsClient, 0),
+		SshServerClients: &sync.Map{},
+		SshProxyClients:  &sync.Map{},
+		WebsocketClients: &sync.Map{},
 		Config:           &config,
 		DB:               db,
 		LogsBucket:       logsBucket,

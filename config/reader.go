@@ -55,9 +55,12 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 		}
 	}
 
-	if client, ok := env.SshProxyClients[conn.RemoteAddr().String()]; ok {
+	if val, ok := env.SshProxyClients.Load(conn.RemoteAddr().String()); ok {
+		client := val.(*SshProxyClient)
 		chanInfo.Closer = closer
+		client.Mutex.Lock()
 		closer.SidKey = strconv.Itoa(len(client.SshShellSessions))
+		client.Mutex.Unlock()
 		closer.User = client.SshServerClient.User
 		closer.Host = client.SshServerClient.ProxyTo
 	}
@@ -115,9 +118,12 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 	pathKey := lr.SshConn.RemoteAddr().String()
 	sidKey := lr.SidKey
 
-	if _, ok := lr.Env.SshProxyClients[pathKey]; ok {
-		if _, ok := lr.Env.WebsocketClients[pathKey+sidKey]; ok {
-			for _, v := range lr.Env.WebsocketClients[pathKey+sidKey] {
+	if proxyClientInterface, ok := lr.Env.SshProxyClients.Load(pathKey); ok {
+		proxyClient := proxyClientInterface.(*SshProxyClient)
+		if clients, ok := lr.Env.WebsocketClients.Load(pathKey + sidKey); ok {
+			wsClientMap := clients.(map[string]*WsClient)
+			for _, v := range wsClientMap {
+				proxyClient.Mutex.Lock()
 				wsClient := v.Client
 				wsWriter, err := wsClient.NextWriter(websocket.TextMessage)
 				if err != nil {
@@ -126,6 +132,7 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 					wsWriter.Write(readBytes)
 					wsWriter.Close()
 				}
+				proxyClient.Mutex.Unlock()
 			}
 		}
 	}

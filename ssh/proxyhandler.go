@@ -22,7 +22,8 @@ func (p *ProxyHandler) Serve() {
 		return
 	}
 
-	meta, ok := p.env.SshProxyClients[p.RemoteAddr().String()]
+	metaInterface, ok := p.env.SshProxyClients.Load(p.RemoteAddr().String())
+	meta := metaInterface.(*config.SshProxyClient)
 	if !ok {
 		p.env.Red.Println("Unable to find SSH Client to connect to server connection.")
 		return
@@ -92,7 +93,9 @@ func (p *ProxyHandler) Serve() {
 
 				switch req.Type {
 				case "shell":
+					meta.Mutex.Lock()
 					meta.SshShellSessions = append(meta.SshShellSessions, chanInfo)
+					meta.Mutex.Unlock()
 				case "exit-status":
 					break r
 				}

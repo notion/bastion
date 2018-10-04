@@ -44,9 +44,9 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 				return nil, errors.New("User is not authorized.")
 			}
 
-			env.SshServerClients[c.RemoteAddr().String()] = &config.SshServerClient{
+			env.SshServerClients.Store(c.RemoteAddr().String(), &config.SshServerClient{
 				User: &sessionUser,
-			}
+			})
 
 			return perms, nil
 		},
@@ -76,7 +76,10 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 			continue
 		}
 
-		env.SshServerClients[sshConn.RemoteAddr().String()].Client = sshConn
+		client, _ := env.SshServerClients.Load(sshConn.RemoteAddr().String())
+		sshClient := client.(*config.SshServerClient)
+
+		sshClient.Client = sshConn
 
 		env.Green.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), sshConn.ClientVersion())
 
@@ -111,8 +114,8 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 		connection.Close()
 		rawConn.Close()
 
-		delete(env.SshServerClients, sshConn.RemoteAddr().String())
-		delete(env.SshProxyClients, rawConn.RemoteAddr().String())
+		env.SshServerClients.Delete(sshConn.RemoteAddr().String())
+		env.SshProxyClients.Delete(rawConn.RemoteAddr().String())
 		env.Magenta.Printf("Session closed")
 	}
 
@@ -127,9 +130,10 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 
 					host := strings.Replace(subsys, "proxy:", "", 1)
 
-					if _, ok := env.SshServerClients[sshConn.RemoteAddr().String()]; ok {
-						env.SshServerClients[sshConn.RemoteAddr().String()].Username = sshConn.User()
-						env.SshServerClients[sshConn.RemoteAddr().String()].ProxyTo = host
+					if serverClientInterface, ok := env.SshServerClients.Load(sshConn.RemoteAddr().String()); ok {
+						serverClient := serverClientInterface.(*config.SshServerClient)
+						serverClient.Username = sshConn.User()
+						serverClient.ProxyTo = host
 
 						rawProxyConn, err := net.Dial("tcp", proxyAddr)
 						if err != nil {
@@ -138,12 +142,13 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 							return
 						}
 
-						env.SshProxyClients[rawProxyConn.LocalAddr().String()] = &config.SshProxyClient{
+						env.SshProxyClients.Store(rawProxyConn.LocalAddr().String(), &config.SshProxyClient{
 							Client:           rawProxyConn,
-							SshServerClient:  env.SshServerClients[sshConn.RemoteAddr().String()],
+							SshServerClient:  serverClient,
 							SshChans:         make([]*config.ConnChan, 0),
 							SshShellSessions: make([]*config.ConnChan, 0),
-						}
+							Mutex:            &sync.Mutex{},
+						})
 
 						var once sync.Once
 						go func() {

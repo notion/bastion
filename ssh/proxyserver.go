@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 )
 
@@ -19,7 +20,8 @@ func startProxyServer(addr string, env *config.Env) {
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
 
-			if _, ok := env.SshProxyClients[c.RemoteAddr().String()]; ok {
+			if proxClient, ok := env.SshProxyClients.Load(c.RemoteAddr().String()); ok {
+				proxyClient := proxClient.(*config.SshProxyClient)
 				duration, err := time.ParseDuration("1m")
 				if err != nil {
 					env.Red.Println("Unable to parse duration to expire:", err)
@@ -49,13 +51,13 @@ func startProxyServer(addr string, env *config.Env) {
 					},
 				}
 
-				client, err := ssh.Dial("tcp", env.SshProxyClients[c.RemoteAddr().String()].SshServerClient.ProxyTo, clientConfig)
+				client, err := ssh.Dial("tcp", proxyClient.SshServerClient.ProxyTo, clientConfig)
 				if err != nil {
 					env.Red.Println("Error in proxy authentication:", err)
 					return nil, err
 				}
 
-				env.SshProxyClients[c.RemoteAddr().String()].SshClient = client
+				proxyClient.SshClient = client
 
 				return nil, err
 			}
@@ -75,20 +77,35 @@ func startProxyServer(addr string, env *config.Env) {
 
 	defer listener.Close()
 
+	mutex := &sync.Mutex{}
+
+	mutex.Lock()
 	stopped := false
+	mutex.Unlock()
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for range c {
 			listener.Close()
+
+			mutex.Lock()
 			stopped = true
+			mutex.Unlock()
+
 			return
 		}
 	}()
 
 	env.Green.Println("Running SSH proxy server at:", addr)
 
-	for !stopped {
+	isStopped := func() bool {
+		mutex.Lock()
+		defer mutex.Unlock()
+		return !stopped
+	}
+
+	for isStopped() {
 		tcpConn, err := listener.Accept()
 		if err != nil {
 			env.Red.Printf("Failed to accept incoming connection (%s)", err)
@@ -100,8 +117,8 @@ func startProxyServer(addr string, env *config.Env) {
 		go func() {
 			sshconn.Serve()
 
-			delete(env.SshProxyClients, tcpConn.RemoteAddr().String())
-			delete(env.WebsocketClients, tcpConn.RemoteAddr().String())
+			env.SshProxyClients.Delete(tcpConn.RemoteAddr().String())
+			env.WebsocketClients.Delete(tcpConn.RemoteAddr().String())
 		}()
 
 		env.Yellow.Printf("New connection from %s (%s)", tcpConn.RemoteAddr())

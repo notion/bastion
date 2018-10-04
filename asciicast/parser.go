@@ -32,7 +32,7 @@ type Frame struct {
 }
 
 func (frame *Frame) Marshal() ([]byte, error) {
-	frameData := make([]interface{}, 3)
+	frameData := make([]interface{}, 4)
 
 	frameData[0] = frame.Time
 	frameData[1] = frame.Event
