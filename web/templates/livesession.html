@@ -22,6 +22,7 @@
                 <th>Host</th>
                 <th>Email</th>
                 <th>Name</th>
+                <th>Disconnect</th>
                 <th>Join</th>
             </tr>
             </thead>
@@ -79,6 +80,12 @@
         });
     }
 
+    function disconnectSession(id, sid) {
+        $.getJSON(`/api/disconnect/${id}/${sid}`, function(data) {
+            window.location.reload();
+        });
+    }
+
     $(function() {
         $('#playModal').on('hidden.bs.modal', function () {
             window.OpenSocket.close();
@@ -91,9 +98,11 @@
                     var place = parseInt(elem) + 1;
                     var session = data.livesessions[elem];
                     var buttons = '';
+                    var disconnectButtons = '';
 
                     for(var i = 0; i < parseInt(session.Sessions); i++) {
                         buttons += `<button onclick="playCast('${session.Name}', ${i})" class="btn btn-sm btn-primary">Join ${i}</button>    `;
+                        disconnectButtons += `<button onclick="disconnectSession('${session.Name}', ${i})" class="btn btn-sm btn-danger">Disconnect ${i}</button>`
                     }
 
                     $("#sessions-table > tbody").append(`
@@ -102,6 +111,7 @@
                             <th>${session.Host}</th>
                             <th>${session.User}</th>
                             <th>${session.Name}</th>
+                            <td>${disconnectButtons}</td>
                             <td>${buttons}</td>
                         </tr>
                     `);

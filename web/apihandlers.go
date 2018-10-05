@@ -256,6 +256,52 @@ func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func disconnectLiveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		retData := make(map[string]interface{})
+
+		vars := mux.Vars(r)
+		pathKey, ok := vars["id"]
+		if !ok {
+			returnErr(w, r, errors.New("can't find id"), http.StatusInternalServerError)
+			return
+		}
+		sidKey, ok := vars["sid"]
+		if !ok {
+			sidKey = ""
+		}
+
+		if proxyClientInterface, ok := env.SshProxyClients.Load(pathKey); ok {
+			proxyClient := proxyClientInterface.(*config.SshProxyClient)
+			place := 0
+			var err error
+			if sidKey != "" {
+				place, err = strconv.Atoi(sidKey)
+				if err != nil {
+					returnErr(w, r, err, http.StatusInternalServerError)
+				}
+			}
+
+			if place < len(proxyClient.SshShellSessions) {
+				proxyClient.Mutex.Lock()
+				chanInfo := proxyClient.SshShellSessions[place]
+				proxyClient.Mutex.Unlock()
+
+				proxyChan := *chanInfo.ProxyChan
+				proxyChan.Close()
+			} else {
+				returnErr(w, r, errors.New("can't find id"), http.StatusInternalServerError)
+			}
+		} else {
+			returnErr(w, r, errors.New("can't find client"), http.StatusInternalServerError)
+		}
+
+		retData["status"] = "ok"
+
+		returnJson(w, r, retData, http.StatusOK)
+	}
+}
+
 func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.Get(r, "session")
