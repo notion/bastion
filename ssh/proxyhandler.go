@@ -89,7 +89,10 @@ func (p *ProxyHandler) Serve() {
 					ReqData:  req.Payload,
 					ReqReply: req.WantReply,
 				}
+
+				meta.Mutex.Lock()
 				chanInfo.Reqs = append(chanInfo.Reqs, reqInfo)
+				meta.Mutex.Unlock()
 
 				switch req.Type {
 				case "shell":

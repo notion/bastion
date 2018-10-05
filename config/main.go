@@ -41,13 +41,14 @@ type User struct {
 
 type Session struct {
 	gorm.Model
-	Name   string
-	Time   time.Time
-	Cast   string `gorm:"type:LONGTEXT;"`
-	UserID uint
-	User   *User
-	Host   string
-	Users  string `gorm:"type:LONGTEXT;"`
+	Name    string
+	Time    time.Time
+	Cast    string `gorm:"type:LONGTEXT;"`
+	UserID  uint
+	User    *User
+	Host    string
+	Users   string `gorm:"type:LONGTEXT;"`
+	Command string `gorm:"type:MEDIUMTEXT;"`
 }
 
 type Env struct {

@@ -19,6 +19,7 @@
                 <th>Name</th>
                 <th>Play</th>
                 <th>Play With Users</th>
+                <th>Command</th>
             </tr>
             </thead>
             <tbody>
@@ -174,6 +175,7 @@
                             <th>${session.Name}</th>
                             <td><button onclick="playCast('${session.Name}')" class="btn btn-primary">Play</button></td>
                             <td><button onclick="playCastTerm('${session.Name}')" class="btn btn-primary">Play With Users</button></td>
+                            <th>${session.Command}</th>
                         </tr>
                     `);
                 }

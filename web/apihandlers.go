@@ -153,7 +153,7 @@ func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			env.DB.Select([]string{"user_id", "time", "name", "host", "users"}).First(&dbSession, "name = ?", object.Name).Select([]string{"email"}).Related(&dbUser, "UserID")
+			env.DB.Select([]string{"user_id", "time", "name", "host", "users", "command"}).First(&dbSession, "name = ?", object.Name).Select([]string{"email"}).Related(&dbUser, "UserID")
 
 			dbSession.User = &dbUser
 
@@ -201,6 +201,24 @@ func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 				sessionData["Host"] = client.SshServerClient.ProxyTo
 				sessionData["User"] = client.SshServerClient.User.Email
 				sessionData["Sessions"] = len(client.SshShellSessions)
+				wholeCommand := ""
+
+				for _, v := range client.SshShellSessions {
+					for _, r := range v.Reqs {
+						if r.ReqType == "shell" || r.ReqType == "exec" {
+							command := ""
+							if string(r.ReqData) == "" {
+								command = "Main Shell"
+							} else {
+								command = string(r.ReqData)
+							}
+
+							wholeCommand += command + ", "
+							break
+						}
+					}
+				}
+				sessionData["Command"] = wholeCommand
 				newSessions = append(newSessions, sessionData)
 			}
 			client.Mutex.Unlock()

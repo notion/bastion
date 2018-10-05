@@ -28,8 +28,9 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 				Timestamp: time.Now().Unix(),
 			},
 		},
-		Env:   env,
-		Mutex: &sync.Mutex{},
+		Env:      env,
+		Mutex:    &sync.Mutex{},
+		ChanInfo: chanInfo,
 	}
 
 	if env.LogsBucket != nil {
@@ -90,6 +91,7 @@ type AsciicastReadCloser struct {
 	CurrentUser string
 	Mutex       *sync.Mutex
 	Users       string
+	ChanInfo    *ConnChan
 }
 
 func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
@@ -178,12 +180,32 @@ func (lr *AsciicastReadCloser) Close() error {
 		lr.Env.Red.Println("Error logging session", err)
 	}
 
+	if val, ok := lr.Env.SshProxyClients.Load(lr.SshConn.RemoteAddr().String()); ok {
+		client := val.(*SshProxyClient)
+
+		client.Mutex.Lock()
+		for _, v := range lr.ChanInfo.Reqs {
+			if v.ReqType == "shell" || v.ReqType == "exec" {
+				command := ""
+				if string(v.ReqData) == "" {
+					command = "Main Shell"
+				} else {
+					command = string(v.ReqData)
+				}
+				lr.Cast.Header.Command = command
+				break
+			}
+		}
+		client.Mutex.Unlock()
+	}
+
 	session := &Session{
-		Name:  lr.BkWriter.Name,
-		Time:  lr.Time,
-		Cast:  data,
-		Host:  lr.Host,
-		Users: lr.Users,
+		Name:    lr.BkWriter.Name,
+		Time:    lr.Time,
+		Cast:    data,
+		Host:    lr.Host,
+		Users:   lr.Users,
+		Command: lr.Cast.Header.Command,
 	}
 
 	if lr.User != nil {
