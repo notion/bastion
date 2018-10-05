@@ -89,7 +89,11 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 
 				user.Email = userData["email"].(string)
 				user.AuthToken = token.AccessToken
-				user.AuthorizedHosts = env.Config.DefaultHosts
+
+				if user.AuthorizedHosts == "" {
+					user.AuthorizedHosts = env.Config.DefaultHosts
+				}
+
 				env.DB.Save(&user)
 
 				if user.Cert != nil {
@@ -149,7 +153,7 @@ func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			env.DB.Select([]string{"user_id", "time", "name", "host"}).First(&dbSession, "name = ?", object.Name).Select([]string{"email"}).Related(&dbUser, "UserID")
+			env.DB.Select([]string{"user_id", "time", "name", "host", "users"}).First(&dbSession, "name = ?", object.Name).Select([]string{"email"}).Related(&dbUser, "UserID")
 
 			dbSession.User = &dbUser
 

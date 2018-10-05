@@ -47,6 +47,7 @@ type Session struct {
 	UserID uint
 	User   *User
 	Host   string
+	Users  string `gorm:"type:LONGTEXT;"`
 }
 
 type Env struct {

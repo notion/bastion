@@ -66,6 +66,8 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 		client.Mutex.Unlock()
 		closer.User = client.SshServerClient.User
 		closer.Host = client.SshServerClient.ProxyTo
+
+		closer.Users = closer.User.Email
 	}
 
 	return closer
@@ -87,6 +89,7 @@ type AsciicastReadCloser struct {
 	SidKey      string
 	CurrentUser string
 	Mutex       *sync.Mutex
+	Users       string
 }
 
 func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
@@ -114,6 +117,10 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 		Event:  "o",
 		Data:   string(readBytes),
 		Author: currentUser,
+	}
+
+	if !strings.Contains(lr.Users, currentUser) {
+		lr.Users += ", " + currentUser
 	}
 
 	if currentUser != "" && strings.HasSuffix(string(readBytes), ":~# ") {
@@ -172,10 +179,11 @@ func (lr *AsciicastReadCloser) Close() error {
 	}
 
 	session := &Session{
-		Name: lr.BkWriter.Name,
-		Time: lr.Time,
-		Cast: data,
-		Host: lr.Host,
+		Name:  lr.BkWriter.Name,
+		Time:  lr.Time,
+		Cast:  data,
+		Host:  lr.Host,
+		Users: lr.Users,
 	}
 
 	if lr.User != nil {
