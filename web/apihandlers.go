@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/websocket"
+	"github.com/jinzhu/gorm"
 	"github.com/notion/trove_ssh_bastion/config"
 	"github.com/notion/trove_ssh_bastion/ssh"
 	cryptossh "golang.org/x/crypto/ssh"
@@ -135,35 +136,15 @@ func logout(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sessionsData := make([]*config.Session, 0)
-
-		ctx := context.Background()
-		objectsIterator := env.LogsBucket.Objects(ctx, nil)
-
-		var iteratorError error
-
-		for iteratorError == nil {
-			var dbSession config.Session
-			var dbUser config.User
-
-			object, err := objectsIterator.Next()
-
-			if err != nil {
-				iteratorError = err
-				break
-			}
-
-			env.DB.Select([]string{"user_id", "time", "name", "host", "users", "command"}).First(&dbSession, "name = ?", object.Name).Select([]string{"email"}).Related(&dbUser, "UserID")
-
-			dbSession.User = &dbUser
-
-			sessionsData = append(sessionsData, &dbSession)
-		}
+		var sessions []config.Session
+		env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
+			return db.Select([]string{"id", "email"})
+		}).Select([]string{"user_id", "time", "name", "host", "users", "command"}).Find(&sessions)
 
 		retData := make(map[string]interface{})
 
 		retData["status"] = "ok"
-		retData["sessions"] = sessionsData
+		retData["sessions"] = sessions
 
 		returnJson(w, r, retData, 0)
 	}
