@@ -41,14 +41,15 @@ type User struct {
 
 type Session struct {
 	gorm.Model
-	Name    string
-	Time    time.Time
-	Cast    string `gorm:"type:LONGTEXT;"`
-	UserID  uint
-	User    *User
-	Host    string
-	Users   string `gorm:"type:LONGTEXT;"`
-	Command string `gorm:"type:MEDIUMTEXT;"`
+	Name     string `gorm:"type:MEDIUMTEXT;"`
+	Time     time.Time
+	Cast     string `gorm:"type:LONGTEXT;"`
+	UserID   uint
+	User     *User
+	Host     string `gorm:"type:MEDIUMTEXT;"`
+	Hostname string `gorm:"type:MEDIUMTEXT;"`
+	Users    string `gorm:"type:LONGTEXT;"`
+	Command  string `gorm:"type:MEDIUMTEXT;"`
 }
 
 type Env struct {
@@ -73,14 +74,15 @@ type WsClient struct {
 }
 
 type SshServerClient struct {
-	Client       *ssh.ServerConn
-	RawProxyConn net.Conn
-	ProxyTo      string
-	Username     string
-	Password     string
-	PublicKey    ssh.PublicKey
-	Agent        *agent.Agent
-	User         *User
+	Client          *ssh.ServerConn
+	RawProxyConn    net.Conn
+	ProxyTo         string
+	ProxyToHostname string
+	Username        string
+	Password        string
+	PublicKey       ssh.PublicKey
+	Agent           *agent.Agent
+	User            *User
 }
 
 type SshProxyClient struct {

@@ -139,7 +139,7 @@ func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		var sessions []config.Session
 		env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
 			return db.Select([]string{"id", "email"})
-		}).Select([]string{"user_id", "time", "name", "host", "users", "command"}).Find(&sessions)
+		}).Select([]string{"user_id", "time", "name", "host", "hostname", "users", "command"}).Find(&sessions)
 
 		retData := make(map[string]interface{})
 
@@ -180,6 +180,7 @@ func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 				sessionData := make(map[string]interface{})
 				sessionData["Name"] = key.(string)
 				sessionData["Host"] = client.SshServerClient.ProxyTo
+				sessionData["Hostname"] = client.SshServerClient.ProxyToHostname
 				sessionData["User"] = client.SshServerClient.User.Email
 				sessionData["Sessions"] = len(client.SshShellSessions)
 				wholeCommand := ""

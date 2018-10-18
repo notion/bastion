@@ -67,6 +67,7 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 		client.Mutex.Unlock()
 		closer.User = client.SshServerClient.User
 		closer.Host = client.SshServerClient.ProxyTo
+		closer.Hostname = client.SshServerClient.ProxyToHostname
 
 		closer.Users = closer.User.Email
 	}
@@ -87,6 +88,7 @@ type AsciicastReadCloser struct {
 	GZWriter    *gzip.Writer
 	User        *User
 	Host        string
+	Hostname    string
 	SidKey      string
 	CurrentUser string
 	Mutex       *sync.Mutex
@@ -200,12 +202,13 @@ func (lr *AsciicastReadCloser) Close() error {
 	}
 
 	session := &Session{
-		Name:    lr.BkWriter.Name,
-		Time:    lr.Time,
-		Cast:    data,
-		Host:    lr.Host,
-		Users:   lr.Users,
-		Command: lr.Cast.Header.Command,
+		Name:     lr.BkWriter.Name,
+		Time:     lr.Time,
+		Cast:     data,
+		Host:     lr.Host,
+		Hostname: lr.Hostname,
+		Users:    lr.Users,
+		Command:  lr.Cast.Header.Command,
 	}
 
 	if lr.User != nil {

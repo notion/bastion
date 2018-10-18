@@ -74,6 +74,8 @@ func startProxyServer(addr string, env *config.Env) {
 						env.Red.Println("Unable to match regex for host:", err)
 					}
 
+					proxyClient.SshServerClient.ProxyToHostname = strings.TrimSpace(stdoutBuf.String())
+
 					if !regexMatch {
 						return nil, errors.New("can't find initial proxy connection")
 					}
