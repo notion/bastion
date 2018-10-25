@@ -22,7 +22,7 @@ func main() {
 	env := config.Load(*forceCerts)
 
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, os.Kill)
 	go func() {
 		for range c {
 			shutdown(env)
