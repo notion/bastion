@@ -244,7 +244,7 @@ func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 
 		pathKey, ok := c.Params.Get("id")
 		if !ok {
-			returnErr(c.Writer, c.Request, errors.New("can't find id"), http.StatusInternalServerError)
+			c.AbortWithError(http.StatusInternalServerError, errors.New("can't find id"))
 			return
 		}
 		sidKey, ok := c.Params.Get("sid")
@@ -259,7 +259,7 @@ func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 			if sidKey != "" {
 				place, err = strconv.Atoi(sidKey)
 				if err != nil {
-					returnErr(c.Writer, c.Request, err, http.StatusInternalServerError)
+					c.AbortWithError(http.StatusInternalServerError, err)
 				}
 			}
 
@@ -271,10 +271,10 @@ func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 				proxyChan := *chanInfo.ProxyChan
 				proxyChan.Close()
 			} else {
-				returnErr(c.Writer, c.Request, errors.New("can't find id"), http.StatusInternalServerError)
+				c.AbortWithError(http.StatusInternalServerError, errors.New("can't find id"))
 			}
 		} else {
-			returnErr(c.Writer, c.Request, errors.New("can't find client"), http.StatusInternalServerError)
+			c.AbortWithError(http.StatusInternalServerError, errors.New("can't find client"))
 		}
 
 		retData["status"] = "ok"
@@ -290,7 +290,7 @@ func liveSessionWS(env *config.Env) func(c *gin.Context) {
 
 		pathKey, ok := c.Params.Get("id")
 		if !ok {
-			returnErr(c.Writer, c.Request, errors.New("can't find id"), http.StatusInternalServerError)
+			c.AbortWithError(http.StatusInternalServerError, errors.New("can't find id"))
 			return
 		}
 		sidKey, ok := c.Params.Get("sid")
@@ -401,7 +401,7 @@ func user(env *config.Env) func(c *gin.Context) {
 		retData["status"] = "ok"
 		retData["users"] = users
 
-		returnJson(c.Writer, c.Request, retData, 0)
+		c.JSON(http.StatusOK, retData)
 	}
 }
 
