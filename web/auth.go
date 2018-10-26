@@ -1,37 +1,49 @@
 package web
 
 import (
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
 	"github.com/notion/trove_ssh_bastion/config"
 	"net/http"
 	"regexp"
 )
 
-func authMiddleware(env *config.Env) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			session, err := store.Get(r, storeName)
-			if err != nil {
-				http.Redirect(w, r, "/", http.StatusFound)
-				return
-			}
+var (
+	passPathsIfAuthed = map[string]bool{
+		"/noaccess": true,
+	}
 
-			if auth, ok := session.Values["loggedin"]; ok {
-				userData := session.Values["user"].(*config.User)
+	passPaths = map[string]bool{
+		"/":       true,
+		"/logout": true,
+	}
+)
 
-				if auth.(bool) {
-					match, _ := regexp.MatchString("^\\/api\\/users\\/(.*)\\/keys$", r.URL.Path)
-					if userData.Admin || r.URL.Path == "/noaccess" || match {
-						next.ServeHTTP(w, r)
-						return
-					} else {
-						http.Redirect(w, r, "/noaccess", http.StatusFound)
-						return
-					}
+func authMiddleware(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+
+		if auth := session.Get("loggedin"); auth != nil {
+			userData := session.Get("user").(*config.User)
+
+			if auth.(bool) {
+				match, _ := regexp.MatchString("^\\/api\\/users\\/(.*)\\/keys$", c.Request.URL.Path)
+				if userData.Admin || passPathsIfAuthed[c.Request.URL.Path] || passPaths[c.Request.URL.Path] || match {
+					c.Next()
+					return
+				} else {
+					c.Redirect(http.StatusFound, "/noaccess")
+					return
 				}
 			}
+		}
 
-			http.Redirect(w, r, "/", http.StatusFound)
-			return
-		})
+		if passPaths[c.Request.URL.Path] {
+			c.Next()
+		} else {
+			c.Redirect(http.StatusFound, "/")
+		}
+
+		return
 	}
 }

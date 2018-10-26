@@ -2,15 +2,14 @@ package web
 
 import (
 	"encoding/gob"
-	"github.com/gorilla/mux"
-	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
+	"github.com/gin-contrib/pprof"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/oauth2"
-	"html/template"
 	"net/http"
-	"net/http/pprof"
 )
 
 var (
@@ -18,8 +17,7 @@ var (
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
 
-	storeName = "session"
-	store     = sessions.NewCookieStore(securecookie.GenerateRandomKey(32), securecookie.GenerateRandomKey(32))
+	store = cookie.NewStore([]byte("test"))
 )
 
 func Serve(addr string, env *config.Env) {
@@ -27,48 +25,52 @@ func Serve(addr string, env *config.Env) {
 	env.Vconfig.SetDefault("OauthCredentials", &oauthConfig)
 	env.Vconfig.UnmarshalKey("OauthCredentials", &oauthConfig)
 
-	templs, err := template.ParseGlob("web/templates/*")
-	if err != nil {
-		env.Red.Println("ERROR PARSING TEMPLATE GLOB:", err)
-	}
-
-	store.MaxAge(1 * 60 * 60)
+	store.Options(sessions.Options{
+		MaxAge: 1 * 60 * 60,
+	})
 
 	gob.Register(&oauth2.Token{})
 	gob.Register(&config.User{})
 
-	r := mux.NewRouter()
+	r := gin.Default()
+	r.Use(sessions.Sessions("session", store))
+	r.LoadHTMLGlob("web/templates/*")
+	pprof.Register(r, nil)
 
-	r.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
+	authedGroup := r.Group("/", authMiddleware(env))
+	{
+		authedGroup.GET("", index(env, oauthConfig))
+		authedGroup.GET("/logout", logout(env))
+		authedGroup.GET("/sessions", sessionTempl(env))
+		authedGroup.GET("/livesessions", liveSessionTempl(env))
+		authedGroup.GET("/users", userTempl(env))
+		authedGroup.GET("/noaccess", noaccessTempl(env))
 
-	authedRouter := r.PathPrefix("/").Subrouter()
-	authedRouter.Use(authMiddleware(env))
+		apiGroup := authedGroup.Group("/api")
+		{
+			apiGroup.GET("/livesessions", liveSession(env))
+			userGroup := apiGroup.Group("/users")
+			{
+				userGroup.GET("", user(env))
+				userGroup.POST("/:id", updateUser(env))
+				userGroup.GET("/:id/keys", downloadKey(env))
+			}
 
-	r.HandleFunc("/", index(env, oauthConfig))
-	r.HandleFunc("/logout", logout(env))
-	authedRouter.HandleFunc("/sessions", sessionTempl(env, templs))
-	authedRouter.HandleFunc("/livesessions", liveSessionTempl(env, templs))
-	authedRouter.HandleFunc("/users", userTempl(env, templs))
-	authedRouter.HandleFunc("/noaccess", noaccessTempl(env, templs))
-
-	authedRouter.HandleFunc("/api/users", user(env))
-	authedRouter.HandleFunc("/api/user/{id}", updateUser(env))
-	authedRouter.HandleFunc("/api/users/{id}/keys", downloadKey(env))
-	authedRouter.HandleFunc("/api/livesessions", liveSession(env))
-	r.HandleFunc("/api/opensessions", openSessions(env)) // TODO
-	authedRouter.HandleFunc("/api/ws/livesessions/{id}", liveSessionWS(env))
-	authedRouter.HandleFunc("/api/ws/livesessions/{id}/{sid}", liveSessionWS(env))
-	authedRouter.HandleFunc("/api/disconnect/{id}", disconnectLiveSession(env))
-	authedRouter.HandleFunc("/api/disconnect/{id}/{sid}", disconnectLiveSession(env))
-	authedRouter.HandleFunc("/api/sessions", session(env))
-	authedRouter.HandleFunc("/api/sessions/{id}", sessionId(env))
-
-	srv := &http.Server{
-		Handler: logHTTP(r, env),
-		Addr:    addr,
+			wsGroup := apiGroup.Group("/ws")
+			{
+				wsGroup.GET("/livesessions/:id", liveSessionWS(env))
+				wsGroup.GET("/livesessions/:id/:sid", liveSessionWS(env))
+			}
+			apiGroup.GET("/disconnect/:id", disconnectLiveSession(env))
+			apiGroup.GET("/disconnect/:id/:sid", disconnectLiveSession(env))
+			apiGroup.GET("/sessions", session(env))
+			apiGroup.GET("/sessions/:id", sessionId(env))
+		}
 	}
+
+	r.GET("/api/opensessions", openSessions(env))
 
 	env.Green.Println("Running HTTP server at:", addr)
 
-	env.Red.Fatal(srv.ListenAndServe())
+	env.Red.Fatal(r.Run(addr))
 }

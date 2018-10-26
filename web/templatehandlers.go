@@ -1,66 +1,51 @@
 package web
 
 import (
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
 	"github.com/notion/trove_ssh_bastion/config"
-	"html/template"
 	"net/http"
 )
 
-func sessionTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "session")
-		if err != nil {
-			env.Red.Println("Can't get session from request", err)
-		}
+func sessionTempl(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userData := session.Get("user").(*config.User)
 
-		userData := session.Values["user"].(*config.User)
-
-		templs.Lookup("session").Execute(w, userData)
+		c.HTML(http.StatusOK, "session", userData)
 	}
 }
 
-func liveSessionTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "session")
-		if err != nil {
-			env.Red.Println("Can't get session from request", err)
-		}
+func liveSessionTempl(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userData := session.Get("user").(*config.User)
 
-		userData := session.Values["user"].(*config.User)
-
-		templs.Lookup("livesession").Execute(w, userData)
+		c.HTML(http.StatusOK, "livesession", userData)
 	}
 }
 
-func userTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "session")
-		if err != nil {
-			env.Red.Println("Can't get session from request", err)
-		}
+func userTempl(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userData := session.Get("user").(*config.User)
 
-		userData := session.Values["user"].(*config.User)
-
-		templs.Lookup("user").Execute(w, userData)
+		c.HTML(http.StatusOK, "user", userData)
 	}
 }
 
-func noaccessTempl(env *config.Env, templs *template.Template) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "session")
-		if err != nil {
-			env.Red.Println("Can't get session from request", err)
-		}
-
-		userData := session.Values["user"].(*config.User)
+func noaccessTempl(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userData := session.Get("user").(*config.User)
 
 		var fullUser config.User
 
 		if env.DB.First(&fullUser, userData.ID).RecordNotFound() {
-			http.Redirect(w, r, "/", http.StatusFound)
+			c.Redirect(http.StatusFound, "/")
 			return
 		}
 
-		templs.Lookup("noaccess").Execute(w, userData)
+		c.HTML(http.StatusOK, "noaccess", userData)
 	}
 }

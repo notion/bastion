@@ -1,5 +1,6 @@
 package web
 
+import "C"
 import (
 	"archive/zip"
 	"bytes"
@@ -9,7 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
@@ -27,35 +29,28 @@ import (
 var signer cryptossh.Signer
 var casigner *ssh.CASigner
 
-func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		code := r.URL.Query().Get("code")
-
-		session, err := store.Get(r, "session")
-		if err != nil {
-			env.Red.Println("Can't get session from request", err)
-		}
+func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		code := c.Query("code")
+		session := sessions.Default(c)
 
 		if code == "" {
-			if k, ok := session.Values["loggedin"]; ok {
-				if k.(bool) {
-					http.Redirect(w, r, "/sessions", http.StatusFound)
+			if loggedIn := session.Get("loggedin"); loggedIn != nil {
+				if loggedIn.(bool) {
+					http.Redirect(c.Writer, c.Request, "/sessions", http.StatusFound)
 					return
 				}
 			}
 
 			state := sha256.Sum256(securecookie.GenerateRandomKey(32))
 
-			session.Values["state"] = base64.URLEncoding.EncodeToString(state[:])
-			err = session.Save(r, w)
-			if err != nil {
-				env.Red.Println("Error saving session:", err)
-			}
+			session.Set("state", base64.URLEncoding.EncodeToString(state[:]))
+			session.Save()
 
-			http.Redirect(w, r, conf.AuthCodeURL(session.Values["state"].(string)), http.StatusFound)
+			c.Redirect(http.StatusFound, conf.AuthCodeURL(session.Get("state").(string)))
 			return
 		} else {
-			if r.URL.Query().Get("state") == session.Values["state"] {
+			if c.Query("state") == session.Get("state") {
 				token, err := conf.Exchange(context.TODO(), code)
 				if err != nil {
 					env.Red.Println("ISSUE EXCHANGING CODE:", err)
@@ -102,40 +97,34 @@ func index(env *config.Env, conf oauth2.Config) func(w http.ResponseWriter, r *h
 					user.PrivateKey = []byte{}
 				}
 
-				session.Values["user"] = user
-				session.Values["loggedin"] = true
-				err = session.Save(r, w)
-				if err != nil {
-					env.Red.Println("Error saving session:", err)
-				}
+				session.Set("user", user)
+				session.Set("loggedin", true)
+				session.Save()
 
-				http.Redirect(w, r, "/sessions", http.StatusFound)
+				c.Redirect(http.StatusFound, "/sessions")
 				return
 			} else {
-				http.Redirect(w, r, "/", http.StatusFound)
+				c.Redirect(http.StatusFound, "/")
 				return
 			}
 		}
 	}
 }
 
-func logout(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "session")
-		if err != nil {
-			env.Red.Println("Can't get session from request", err)
-		}
+func logout(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
 
-		session.Values = make(map[interface{}]interface{})
-		session.Save(r, w)
+		session.Clear()
+		session.Save()
 
-		http.Redirect(w, r, "/", http.StatusFound)
+		c.Redirect(http.StatusFound, "/")
 		return
 	}
 }
 
-func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+func session(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
 		var sessions []config.Session
 		env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
 			return db.Select([]string{"id", "email"})
@@ -146,29 +135,29 @@ func session(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		retData["status"] = "ok"
 		retData["sessions"] = sessions
 
-		returnJson(w, r, retData, 0)
+		c.JSON(http.StatusOK, retData)
 	}
 }
 
-func sessionId(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
+func sessionId(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		id, _ := c.Params.Get("id")
 		ctx := context.Background()
 
-		reader, err := env.LogsBucket.Object(vars["id"]).ReadCompressed(true).NewReader(ctx)
+		reader, err := env.LogsBucket.Object(id).ReadCompressed(true).NewReader(ctx)
 		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
+			c.Writer.WriteHeader(http.StatusNotFound)
 		} else {
-			w.Header().Set("Content-Encoding", "gzip")
-			w.Header().Set("Transfer-Encoding", "gzip")
-			w.WriteHeader(http.StatusOK)
-			io.Copy(w, reader)
+			c.Header("Content-Encoding", "gzip")
+			c.Header("Transfer-Encoding", "gzip")
+			c.Writer.WriteHeader(http.StatusOK)
+			io.Copy(c.Writer, reader)
 		}
 	}
 }
 
-func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+func liveSession(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
 		var newSessions []interface{}
@@ -211,19 +200,12 @@ func liveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		retData["status"] = "ok"
 		retData["livesessions"] = newSessions
 
-		jsonData, err := json.Marshal(retData)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write(jsonData)
+		c.JSON(http.StatusOK, retData)
 	}
 }
 
-func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+func openSessions(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
 		var newSessions []interface{}
@@ -252,21 +234,20 @@ func openSessions(env *config.Env) func(w http.ResponseWriter, r *http.Request) 
 		retData["status"] = "ok"
 		retData["livesessions"] = newSessions
 
-		returnJson(w, r, retData, http.StatusOK)
+		c.JSON(http.StatusOK, retData)
 	}
 }
 
-func disconnectLiveSession(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
-		vars := mux.Vars(r)
-		pathKey, ok := vars["id"]
+		pathKey, ok := c.Params.Get("id")
 		if !ok {
-			returnErr(w, r, errors.New("can't find id"), http.StatusInternalServerError)
+			returnErr(c.Writer, c.Request, errors.New("can't find id"), http.StatusInternalServerError)
 			return
 		}
-		sidKey, ok := vars["sid"]
+		sidKey, ok := c.Params.Get("sid")
 		if !ok {
 			sidKey = ""
 		}
@@ -278,7 +259,7 @@ func disconnectLiveSession(env *config.Env) func(w http.ResponseWriter, r *http.
 			if sidKey != "" {
 				place, err = strconv.Atoi(sidKey)
 				if err != nil {
-					returnErr(w, r, err, http.StatusInternalServerError)
+					returnErr(c.Writer, c.Request, err, http.StatusInternalServerError)
 				}
 			}
 
@@ -290,41 +271,36 @@ func disconnectLiveSession(env *config.Env) func(w http.ResponseWriter, r *http.
 				proxyChan := *chanInfo.ProxyChan
 				proxyChan.Close()
 			} else {
-				returnErr(w, r, errors.New("can't find id"), http.StatusInternalServerError)
+				returnErr(c.Writer, c.Request, errors.New("can't find id"), http.StatusInternalServerError)
 			}
 		} else {
-			returnErr(w, r, errors.New("can't find client"), http.StatusInternalServerError)
+			returnErr(c.Writer, c.Request, errors.New("can't find client"), http.StatusInternalServerError)
 		}
 
 		retData["status"] = "ok"
 
-		returnJson(w, r, retData, http.StatusOK)
+		c.JSON(http.StatusOK, retData)
 	}
 }
 
-func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, "session")
-		if err != nil {
-			env.Red.Println("Can't get session from request", err)
-		}
+func liveSessionWS(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userData := session.Get("user").(*config.User)
 
-		userData := session.Values["user"].(*config.User)
-
-		vars := mux.Vars(r)
-		pathKey, ok := vars["id"]
+		pathKey, ok := c.Params.Get("id")
 		if !ok {
-			returnErr(w, r, errors.New("can't find id"), http.StatusInternalServerError)
+			returnErr(c.Writer, c.Request, errors.New("can't find id"), http.StatusInternalServerError)
 			return
 		}
-		sidKey, ok := vars["sid"]
+		sidKey, ok := c.Params.Get("sid")
 		if !ok {
 			sidKey = ""
 		}
 
-		c, err := upgrader.Upgrade(w, r, nil)
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 
-		env.Blue.Println("New WebSocket Connection From:", r.RemoteAddr)
+		env.Blue.Println("New WebSocket Connection From:", c.Request.RemoteAddr)
 		env.Blue.Println("Path:", pathKey, sidKey)
 
 		if err != nil {
@@ -347,11 +323,11 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 
 				chanInfo := proxyClient.SshShellSessions[place]
 
-				clientMap[c.RemoteAddr().String()] = &config.WsClient{
-					Client: c,
+				clientMap[conn.RemoteAddr().String()] = &config.WsClient{
+					Client: conn,
 				}
 
-				wsWriter, err := c.NextWriter(websocket.TextMessage)
+				wsWriter, err := conn.NextWriter(websocket.TextMessage)
 				if err != nil {
 					env.Red.Println("Error establishing ws writer in playback")
 				}
@@ -371,7 +347,7 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 		}
 
 		for {
-			_, p, err := c.ReadMessage()
+			_, p, err := conn.ReadMessage()
 			if err != nil {
 				env.Red.Println("wsReader error:", err)
 				break
@@ -405,18 +381,18 @@ func liveSessionWS(env *config.Env) func(w http.ResponseWriter, r *http.Request)
 		}
 
 		defer func() {
-			c.Close()
+			conn.Close()
 			clientInterface, _ := env.WebsocketClients.Load(pathKey + sidKey)
 			client := clientInterface.(map[string]*config.WsClient)
-			delete(client, c.RemoteAddr().String())
+			delete(client, conn.RemoteAddr().String())
 
-			env.Magenta.Println("Closed WebSocket Connection From:", r.RemoteAddr)
+			env.Magenta.Println("Closed WebSocket Connection From:", c.Request.RemoteAddr)
 		}()
 	}
 }
 
-func user(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+func user(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 		var users []config.User
 
@@ -425,31 +401,25 @@ func user(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		retData["status"] = "ok"
 		retData["users"] = users
 
-		returnJson(w, r, retData, 0)
+		returnJson(c.Writer, c.Request, retData, 0)
 	}
 }
 
-func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Redirect(w, r, "/users", http.StatusFound)
-			return
-		}
-
-		vars := mux.Vars(r)
+func updateUser(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		id, _ := c.Params.Get("id")
 		retData := make(map[string]interface{})
 		var user config.User
 
-		env.DB.Find(&user, vars["id"])
-		r.ParseForm()
+		env.DB.Find(&user, id)
 
-		user.Email = r.Form.Get("email")
-		user.Authorized = r.Form.Get("authorized") == "on"
-		user.Admin = r.Form.Get("admin") == "on"
-		user.AuthorizedHosts = r.Form.Get("authorizedhosts")
-		user.UnixUser = r.Form.Get("unixuser")
+		user.Email = c.PostForm("email")
+		user.Authorized = c.PostForm("authorized") == "on"
+		user.Admin = c.PostForm("admin") == "on"
+		user.AuthorizedHosts = c.PostForm("authorizedhosts")
+		user.UnixUser = c.PostForm("unixuser")
 
-		if user.Authorized && user.Cert == nil || r.Form.Get("override") == "on" {
+		if user.Authorized && user.Cert == nil || c.Query("override") == "on" {
 			if signer == nil {
 				signer = ssh.ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
 			}
@@ -480,29 +450,20 @@ func updateUser(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 		retData["status"] = "ok"
 		retData["user"] = user
 
-		returnJson(w, r, retData, 0)
+		c.JSON(http.StatusOK, retData)
 	}
 }
 
-func downloadKey(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" {
-			http.Redirect(w, r, "/users", http.StatusFound)
-			return
-		}
+func downloadKey(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		sessionUser := session.Get("user").(*config.User)
 
-		session, err := store.Get(r, "session")
-		if err != nil {
-			env.Red.Println("Can't get session from request", err)
-		}
-
-		sessionUser := session.Values["user"].(*config.User)
-
-		vars := mux.Vars(r)
+		id, _ := c.Params.Get("id")
 		var user config.User
 
-		if env.DB.Find(&user, vars["id"]).RecordNotFound() || user.Cert == nil || (!sessionUser.Admin && sessionUser.ID != user.ID) {
-			http.Redirect(w, r, "/users", http.StatusFound)
+		if env.DB.Find(&user, id).RecordNotFound() || user.Cert == nil || (!sessionUser.Admin && sessionUser.ID != user.ID) {
+			http.Redirect(c.Writer, c.Request, "/users", http.StatusFound)
 			return
 		}
 
@@ -573,8 +534,8 @@ func downloadKey(env *config.Env) func(w http.ResponseWriter, r *http.Request) {
 
 		writer.Close()
 
-		w.Header().Set("Content-Type", "application/zip")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"authorization.zip\""))
-		w.Write(buf.Bytes())
+		c.Header("Content-Type", "application/zip")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"authorization.zip\""))
+		c.Writer.Write(buf.Bytes())
 	}
 }
