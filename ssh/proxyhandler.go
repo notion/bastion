@@ -1,20 +1,23 @@
 package ssh
 
 import (
-	"github.com/notion/trove_ssh_bastion/config"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/notion/trove_ssh_bastion/config"
+	"golang.org/x/crypto/ssh"
 )
 
+// ProxyHandler is the base handler for an SSH Connection and Proxy
 type ProxyHandler struct {
 	net.Conn
 	config *ssh.ServerConfig
 	env    *config.Env
 }
 
+// Serve handles the proxy
 func (p *ProxyHandler) Serve() {
 	clientConn, clientChans, clientReqs, err := ssh.NewServerConn(p, p.config)
 	if err != nil {
@@ -22,14 +25,14 @@ func (p *ProxyHandler) Serve() {
 		return
 	}
 
-	metaInterface, ok := p.env.SshProxyClients.Load(p.RemoteAddr().String())
-	meta := metaInterface.(*config.SshProxyClient)
+	metaInterface, ok := p.env.SSHProxyClients.Load(p.RemoteAddr().String())
+	meta := metaInterface.(*config.SSHProxyClient)
 	if !ok {
 		p.env.Red.Println("Unable to find SSH Client to connect to server connection.")
 		return
 	}
 
-	proxyConn := meta.SshClient
+	proxyConn := meta.SSHClient
 
 	go ssh.DiscardRequests(clientReqs)
 
@@ -55,7 +58,7 @@ func (p *ProxyHandler) Serve() {
 			ProxyChan:   &proxyChannel,
 			ClientChan:  &clientChannel,
 		}
-		meta.SshChans = append(meta.SshChans, chanInfo)
+		meta.SSHChans = append(meta.SSHChans, chanInfo)
 
 		go func() {
 
@@ -97,7 +100,7 @@ func (p *ProxyHandler) Serve() {
 				switch req.Type {
 				case "shell":
 					meta.Mutex.Lock()
-					meta.SshShellSessions = append(meta.SshShellSessions, chanInfo)
+					meta.SSHShellSessions = append(meta.SSHShellSessions, chanInfo)
 					meta.Mutex.Unlock()
 				case "exit-status":
 					break r

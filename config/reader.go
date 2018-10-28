@@ -2,23 +2,25 @@ package config
 
 import (
 	"bytes"
-	"cloud.google.com/go/storage"
 	"compress/gzip"
 	"context"
-	"github.com/gorilla/websocket"
-	"github.com/notion/trove_ssh_bastion/asciicast"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"cloud.google.com/go/storage"
+	"github.com/gorilla/websocket"
+	"github.com/notion/trove_ssh_bastion/asciicast"
+	"golang.org/x/crypto/ssh"
 )
 
+// NewAsciicastReadCloser initializes an AsciiCast ReaderCloser for SSH logging
 func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, height int, chanInfo *ConnChan, env *Env) io.ReadCloser {
 	closer := &AsciicastReadCloser{
 		ReadCloser: r,
-		SshConn:    conn,
+		SSHConn:    conn,
 		Time:       time.Now(),
 		Cast: &asciicast.Cast{
 			Header: &asciicast.Header{
@@ -59,15 +61,15 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 		}
 	}
 
-	if val, ok := env.SshProxyClients.Load(conn.RemoteAddr().String()); ok {
-		client := val.(*SshProxyClient)
+	if val, ok := env.SSHProxyClients.Load(conn.RemoteAddr().String()); ok {
+		client := val.(*SSHProxyClient)
 		chanInfo.Closer = closer
 		client.Mutex.Lock()
-		closer.SidKey = strconv.Itoa(len(client.SshShellSessions))
+		closer.SidKey = strconv.Itoa(len(client.SSHShellSessions))
 		client.Mutex.Unlock()
-		closer.User = client.SshServerClient.User
-		closer.Host = client.SshServerClient.ProxyTo
-		closer.Hostname = client.SshServerClient.ProxyToHostname
+		closer.User = client.SSHServerClient.User
+		closer.Host = client.SSHServerClient.ProxyTo
+		closer.Hostname = client.SSHServerClient.ProxyToHostname
 
 		closer.Users = closer.User.Email
 	}
@@ -75,10 +77,11 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 	return closer
 }
 
+// AsciicastReadCloser is the main Asciicast ReadCloser
 type AsciicastReadCloser struct {
 	io.ReadCloser
 
-	SshConn     ssh.ConnMetadata
+	SSHConn     ssh.ConnMetadata
 	Cast        *asciicast.Cast
 	Time        time.Time
 	Buffer      bytes.Buffer
@@ -145,11 +148,11 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 		lr.Env.Red.Println("Error writing frame to bucket object", err)
 	}
 
-	pathKey := lr.SshConn.RemoteAddr().String()
+	pathKey := lr.SSHConn.RemoteAddr().String()
 	sidKey := lr.SidKey
 
-	if proxyClientInterface, ok := lr.Env.SshProxyClients.Load(pathKey); ok {
-		proxyClient := proxyClientInterface.(*SshProxyClient)
+	if proxyClientInterface, ok := lr.Env.SSHProxyClients.Load(pathKey); ok {
+		proxyClient := proxyClientInterface.(*SSHProxyClient)
 		if clients, ok := lr.Env.WebsocketClients.Load(pathKey + sidKey); ok {
 			wsClientMap := clients.(map[string]*WsClient)
 			for _, v := range wsClientMap {
@@ -176,14 +179,15 @@ func (lr *AsciicastReadCloser) Read(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Close closes the ReadCloser and uploads it to Google Cloud Storage
 func (lr *AsciicastReadCloser) Close() error {
 	data, err := lr.Cast.Marshal()
 	if err != nil {
 		lr.Env.Red.Println("Error logging session", err)
 	}
 
-	if val, ok := lr.Env.SshProxyClients.Load(lr.SshConn.RemoteAddr().String()); ok {
-		client := val.(*SshProxyClient)
+	if val, ok := lr.Env.SSHProxyClients.Load(lr.SSHConn.RemoteAddr().String()); ok {
+		client := val.(*SSHProxyClient)
 
 		client.Mutex.Lock()
 		for _, v := range lr.ChanInfo.Reqs {

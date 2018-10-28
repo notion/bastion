@@ -3,8 +3,6 @@ package ssh
 import (
 	"bytes"
 	"errors"
-	"github.com/notion/trove_ssh_bastion/config"
-	"golang.org/x/crypto/ssh"
 	"net"
 	"os"
 	"os/signal"
@@ -12,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/notion/trove_ssh_bastion/config"
+	"golang.org/x/crypto/ssh"
 )
 
 func startProxyServer(addr string, env *config.Env) {
@@ -23,8 +24,8 @@ func startProxyServer(addr string, env *config.Env) {
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
 
-			if proxClient, ok := env.SshProxyClients.Load(c.RemoteAddr().String()); ok {
-				proxyClient := proxClient.(*config.SshProxyClient)
+			if proxClient, ok := env.SSHProxyClients.Load(c.RemoteAddr().String()); ok {
+				proxyClient := proxClient.(*config.SSHProxyClient)
 				duration, err := time.ParseDuration("1m")
 				if err != nil {
 					env.Red.Println("Unable to parse duration to expire:", err)
@@ -54,7 +55,7 @@ func startProxyServer(addr string, env *config.Env) {
 					},
 				}
 
-				client, err := ssh.Dial("tcp", proxyClient.SshServerClient.ProxyTo, clientConfig)
+				client, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
 				if err != nil {
 					env.Red.Println("Error in proxy authentication:", err)
 					return nil, err
@@ -68,13 +69,13 @@ func startProxyServer(addr string, env *config.Env) {
 				session.Stdout = &stdoutBuf
 				session.Run("hostname")
 
-				if proxyClient.SshServerClient.User.AuthorizedHosts != "" {
-					regexMatch, err := regexp.MatchString(proxyClient.SshServerClient.User.AuthorizedHosts, strings.TrimSpace(stdoutBuf.String()))
+				if proxyClient.SSHServerClient.User.AuthorizedHosts != "" {
+					regexMatch, err := regexp.MatchString(proxyClient.SSHServerClient.User.AuthorizedHosts, strings.TrimSpace(stdoutBuf.String()))
 					if err != nil {
 						env.Red.Println("Unable to match regex for host:", err)
 					}
 
-					proxyClient.SshServerClient.ProxyToHostname = strings.TrimSpace(stdoutBuf.String())
+					proxyClient.SSHServerClient.ProxyToHostname = strings.TrimSpace(stdoutBuf.String())
 
 					if !regexMatch {
 						return nil, errors.New("can't find initial proxy connection")
@@ -83,13 +84,13 @@ func startProxyServer(addr string, env *config.Env) {
 					return nil, errors.New("can't find initial proxy connection")
 				}
 
-				realClient, err := ssh.Dial("tcp", proxyClient.SshServerClient.ProxyTo, clientConfig)
+				realClient, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
 				if err != nil {
 					env.Red.Println("Error in proxy authentication:", err)
 					return nil, err
 				}
 
-				proxyClient.SshClient = realClient
+				proxyClient.SSHClient = realClient
 
 				return nil, err
 			}
@@ -144,15 +145,15 @@ func startProxyServer(addr string, env *config.Env) {
 			continue
 		}
 
-		sshconn := &ProxyHandler{Conn: tcpConn, config: sshConfig, env: env}
+		SSHConn := &ProxyHandler{Conn: tcpConn, config: sshConfig, env: env}
 
 		go func() {
-			sshconn.Serve()
+			SSHConn.Serve()
 
-			env.SshProxyClients.Delete(tcpConn.RemoteAddr().String())
+			env.SSHProxyClients.Delete(tcpConn.RemoteAddr().String())
 			env.WebsocketClients.Delete(tcpConn.RemoteAddr().String())
 		}()
 
-		env.Yellow.Printf("New connection from %s (%s)", tcpConn.RemoteAddr())
+		env.Yellow.Printf("New connection from %s", tcpConn.RemoteAddr())
 	}
 }

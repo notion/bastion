@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/notion/trove_ssh_bastion/config"
-	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/notion/trove_ssh_bastion/config"
+	"golang.org/x/crypto/ssh"
 )
 
 func startServer(addr string, proxyAddr string, env *config.Env) {
@@ -38,14 +39,14 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 			var sessionUser config.User
 
 			if env.DB.First(&sessionUser, "cert = ?", keyData).RecordNotFound() {
-				return nil, errors.New("User cannot be found.")
+				return nil, errors.New("user cannot be found")
 			}
 
 			if !sessionUser.Authorized {
-				return nil, errors.New("User is not authorized.")
+				return nil, errors.New("user is not authorized")
 			}
 
-			env.SshServerClients.Store(c.RemoteAddr().String(), &config.SshServerClient{
+			env.SSHServerClients.Store(c.RemoteAddr().String(), &config.SSHServerClient{
 				User: &sessionUser,
 			})
 
@@ -71,40 +72,40 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 			continue
 		}
 
-		sshConn, chans, reqs, err := ssh.NewServerConn(tcpConn, sshConfig)
+		SSHConn, chans, reqs, err := ssh.NewServerConn(tcpConn, sshConfig)
 		if err != nil {
 			env.Red.Printf("Failed to handshake (%s)", err)
 			continue
 		}
 
-		client, _ := env.SshServerClients.Load(sshConn.RemoteAddr().String())
-		sshClient := client.(*config.SshServerClient)
+		client, _ := env.SSHServerClients.Load(SSHConn.RemoteAddr().String())
+		SSHClient := client.(*config.SSHServerClient)
 
-		sshClient.Client = sshConn
+		SSHClient.Client = SSHConn
 
-		env.Green.Printf("New SSH connection from %s (%s)", sshConn.RemoteAddr(), sshConn.ClientVersion())
+		env.Green.Printf("New SSH connection from %s (%s)", SSHConn.RemoteAddr(), SSHConn.ClientVersion())
 
 		go ssh.DiscardRequests(reqs)
-		go handleChannels(chans, sshConn, proxyAddr, env)
+		go handleChannels(chans, SSHConn, proxyAddr, env)
 	}
 }
 
-func handleChannels(chans <-chan ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr string, env *config.Env) {
+func handleChannels(chans <-chan ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr string, env *config.Env) {
 	for newChannel := range chans {
-		go handleChannel(newChannel, sshConn, proxyAddr, env)
+		go handleChannel(newChannel, SSHConn, proxyAddr, env)
 	}
 }
 
-func handleChannel(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr string, env *config.Env) {
+func handleChannel(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr string, env *config.Env) {
 	switch channel := newChannel.ChannelType(); channel {
 	case "session":
-		handleSession(newChannel, sshConn, proxyAddr, env)
+		handleSession(newChannel, SSHConn, proxyAddr, env)
 	default:
 		newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", channel))
 	}
 }
 
-func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr string, env *config.Env) {
+func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr string, env *config.Env) {
 	connection, requests, err := newChannel.Accept()
 	if err != nil {
 		env.Red.Printf("Could not accept channel (%s)", err)
@@ -116,10 +117,10 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 
 		if rawConn != nil {
 			rawConn.Close()
-			env.SshProxyClients.Delete(rawConn.RemoteAddr().String())
+			env.SSHProxyClients.Delete(rawConn.RemoteAddr().String())
 		}
 
-		env.SshServerClients.Delete(sshConn.RemoteAddr().String())
+		env.SSHServerClients.Delete(SSHConn.RemoteAddr().String())
 		env.Magenta.Printf("Session closed")
 	}
 
@@ -134,8 +135,8 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 
 					host := strings.Replace(subsys, "proxy:", "", 1)
 
-					if serverClientInterface, ok := env.SshServerClients.Load(sshConn.RemoteAddr().String()); ok {
-						serverClient := serverClientInterface.(*config.SshServerClient)
+					if serverClientInterface, ok := env.SSHServerClients.Load(SSHConn.RemoteAddr().String()); ok {
+						serverClient := serverClientInterface.(*config.SSHServerClient)
 
 						if serverClient.User.AuthorizedHosts != "" {
 							regexMatch, err := regexp.MatchString(serverClient.User.AuthorizedHosts, host)
@@ -152,7 +153,7 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 							return
 						}
 
-						serverClient.Username = sshConn.User()
+						serverClient.Username = SSHConn.User()
 						serverClient.ProxyTo = host
 
 						rawProxyConn, err := net.Dial("tcp", proxyAddr)
@@ -162,11 +163,11 @@ func handleSession(newChannel ssh.NewChannel, sshConn *ssh.ServerConn, proxyAddr
 							return
 						}
 
-						env.SshProxyClients.Store(rawProxyConn.LocalAddr().String(), &config.SshProxyClient{
+						env.SSHProxyClients.Store(rawProxyConn.LocalAddr().String(), &config.SSHProxyClient{
 							Client:           rawProxyConn,
-							SshServerClient:  serverClient,
-							SshChans:         make([]*config.ConnChan, 0),
-							SshShellSessions: make([]*config.ConnChan, 0),
+							SSHServerClient:  serverClient,
+							SSHChans:         make([]*config.ConnChan, 0),
+							SSHShellSessions: make([]*config.ConnChan, 0),
 							Mutex:            &sync.Mutex{},
 						})
 

@@ -6,11 +6,13 @@ import (
 	"strings"
 )
 
+// Cast is the base of the asciicast formate
 type Cast struct {
 	Header *Header
 	Frames []*Frame
 }
 
+// Header corresponds to the asciicast v2 header protocol
 type Header struct {
 	Version       int               `json:"version"`
 	Width         int               `json:"width"`
@@ -24,6 +26,7 @@ type Header struct {
 	Theme         map[string]string `json:"theme,omitempty"`
 }
 
+// Frame is the base frame from an asciicast
 type Frame struct {
 	Time   float64
 	Event  string
@@ -31,6 +34,7 @@ type Frame struct {
 	Author string
 }
 
+// Marshal handles formatting a frame as a JSON line to be read by the asciicast readers
 func (frame *Frame) Marshal() ([]byte, error) {
 	frameData := make([]interface{}, 4)
 
@@ -42,32 +46,35 @@ func (frame *Frame) Marshal() ([]byte, error) {
 	return json.Marshal(frameData)
 }
 
+// Marshal handles formatting a header as a JSON line to be read by the asciicast readers
 func (header *Header) Marshal() ([]byte, error) {
 	return json.Marshal(header)
 }
 
+// Marshal handles formatting a Cast as a JSON file to be read by the asciicast readers
 func (cast *Cast) Marshal() (string, error) {
 	var fileFormat []string
 
-	headerJson, err := cast.Header.Marshal()
+	headerJSON, err := cast.Header.Marshal()
 	if err != nil {
 		log.Println("Error marshaling header")
 	}
 
-	fileFormat = append(fileFormat, string(headerJson))
+	fileFormat = append(fileFormat, string(headerJSON))
 
 	for _, frame := range cast.Frames {
-		frameJson, err := frame.Marshal()
+		frameJSON, err := frame.Marshal()
 		if err != nil {
 			log.Println("Error marshaling frame data")
 		}
 
-		fileFormat = append(fileFormat, string(frameJson))
+		fileFormat = append(fileFormat, string(frameJSON))
 	}
 
 	return strings.Join(fileFormat, "\n"), err
 }
 
+// UnmarshalCast handles formatting a Cast JSON into the Cast
 func UnmarshalCast(data string) (*Cast, error) {
 	var cast Cast
 

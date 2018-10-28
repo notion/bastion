@@ -4,6 +4,7 @@ import (
 	"github.com/notion/trove_ssh_bastion/config"
 )
 
+// Serve handles initializing the SSH Server and Proxy
 func Serve(addr string, proxyAddr string, env *config.Env) {
 	initializeCerts(env, env.ForceGeneration)
 

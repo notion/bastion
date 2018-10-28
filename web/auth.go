@@ -1,11 +1,12 @@
 package web
 
 import (
+	"net/http"
+	"regexp"
+
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/notion/trove_ssh_bastion/config"
-	"net/http"
-	"regexp"
 )
 
 var (
@@ -31,10 +32,10 @@ func authMiddleware(env *config.Env) func(c *gin.Context) {
 				if userData.Admin || passPathsIfAuthed[c.Request.URL.Path] || passPaths[c.Request.URL.Path] || match {
 					c.Next()
 					return
-				} else {
-					c.Redirect(http.StatusFound, "/noaccess")
-					return
 				}
+
+				c.Redirect(http.StatusFound, "/noaccess")
+				return
 			}
 		}
 

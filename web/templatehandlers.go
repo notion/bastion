@@ -1,10 +1,11 @@
 package web
 
 import (
+	"net/http"
+
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/notion/trove_ssh_bastion/config"
-	"net/http"
 )
 
 func sessionTempl(env *config.Env) func(c *gin.Context) {

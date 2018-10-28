@@ -2,6 +2,8 @@ package web
 
 import (
 	"encoding/gob"
+	"net/http"
+
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -9,7 +11,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/oauth2"
-	"net/http"
 )
 
 var (
@@ -20,6 +21,7 @@ var (
 	store = cookie.NewStore([]byte("test"))
 )
 
+// Serve Starts the web server and all of its handlers
 func Serve(addr string, env *config.Env) {
 	oauthConfig := oauth2.Config{}
 	env.Vconfig.SetDefault("OauthCredentials", &oauthConfig)
@@ -64,7 +66,7 @@ func Serve(addr string, env *config.Env) {
 			apiGroup.GET("/disconnect/:id", disconnectLiveSession(env))
 			apiGroup.GET("/disconnect/:id/:sid", disconnectLiveSession(env))
 			apiGroup.GET("/sessions", session(env))
-			apiGroup.GET("/sessions/:id", sessionId(env))
+			apiGroup.GET("/sessions/:id", sessionID(env))
 		}
 	}
 

@@ -1,22 +1,24 @@
 package config
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
-	"github.com/fatih/color"
-	"github.com/gorilla/websocket"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/spf13/viper"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
-	"google.golang.org/api/option"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"cloud.google.com/go/storage"
+	"github.com/fatih/color"
+	"github.com/gorilla/websocket"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite" // Load SQLite for GORM
+	"github.com/spf13/viper"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
+	"google.golang.org/api/option"
 )
 
+// Config is the main config structure and DB Model
 type Config struct {
 	gorm.Model
 	Expires          string `gorm:"default:'48h'"`
@@ -26,6 +28,7 @@ type Config struct {
 	DefaultHosts     string `gorm:"type:MEDIUMTEXT;"`
 }
 
+// User is the model for users and their data
 type User struct {
 	gorm.Model
 	Email           string `gorm:"type:varchar(255);"`
@@ -39,6 +42,7 @@ type User struct {
 	UnixUser        string `gorm:"type:varchar(255);"`
 }
 
+// Session is the model for a specific SSH sessions
 type Session struct {
 	gorm.Model
 	Name     string `gorm:"type:MEDIUMTEXT;"`
@@ -52,11 +56,12 @@ type Session struct {
 	Command  string `gorm:"type:MEDIUMTEXT;"`
 }
 
+// Env is our main context. A pointer of this is passed almost everywhere
 type Env struct {
 	ForceGeneration  bool
 	PKPassphrase     string
-	SshServerClients *sync.Map
-	SshProxyClients  *sync.Map
+	SSHServerClients *sync.Map
+	SSHProxyClients  *sync.Map
 	WebsocketClients *sync.Map
 	DB               *gorm.DB
 	Config           *Config
@@ -69,11 +74,13 @@ type Env struct {
 	Magenta          *ColorLog
 }
 
+// WsClient is a struct that contains a websockets underlying data object
 type WsClient struct {
 	Client *websocket.Conn
 }
 
-type SshServerClient struct {
+// SSHServerClient is a struct containing the client (user's) SSH connection
+type SSHServerClient struct {
 	Client          *ssh.ServerConn
 	RawProxyConn    net.Conn
 	ProxyTo         string
@@ -85,21 +92,24 @@ type SshServerClient struct {
 	User            *User
 }
 
-type SshProxyClient struct {
+// SSHProxyClient is a struct containing the proxy (server's) SSH connection
+type SSHProxyClient struct {
 	Client           net.Conn
-	SshClient        *ssh.Client
-	SshServerClient  *SshServerClient
-	SshShellSessions []*ConnChan
-	SshChans         []*ConnChan
+	SSHClient        *ssh.Client
+	SSHServerClient  *SSHServerClient
+	SSHShellSessions []*ConnChan
+	SSHChans         []*ConnChan
 	Mutex            *sync.Mutex
 }
 
+// ConnReq handles logged data from an SSH Request
 type ConnReq struct {
 	ReqType  string
 	ReqData  []byte
 	ReqReply bool
 }
 
+// ConnChan handles logged data from an SSH Channel
 type ConnChan struct {
 	ChannelType string
 	ChannelData []byte
@@ -113,6 +123,7 @@ type ConnChan struct {
 
 var configFile = "config.yml"
 
+// Load initializes the Env pointer with data from the database and elsewhere
 func Load(forceCerts bool) *Env {
 	vconfig := viper.New()
 
@@ -156,8 +167,8 @@ func Load(forceCerts bool) *Env {
 	return &Env{
 		ForceGeneration:  forceCerts,
 		PKPassphrase:     os.Getenv("PKPASSPHRASE"),
-		SshServerClients: &sync.Map{},
-		SshProxyClients:  &sync.Map{},
+		SSHServerClients: &sync.Map{},
+		SSHProxyClients:  &sync.Map{},
 		WebsocketClients: &sync.Map{},
 		Config:           &config,
 		DB:               db,
@@ -171,6 +182,7 @@ func Load(forceCerts bool) *Env {
 	}
 }
 
+// Save saves current Env data into the database and configs
 func Save(env *Env) {
 	env.DB.Save(env.Config)
 	env.Vconfig.WriteConfigAs(configFile)

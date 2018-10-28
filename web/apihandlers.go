@@ -10,6 +10,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/securecookie"
@@ -19,11 +25,6 @@ import (
 	"github.com/notion/trove_ssh_bastion/ssh"
 	cryptossh "golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 var signer cryptossh.Signer
@@ -49,65 +50,65 @@ func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 
 			c.Redirect(http.StatusFound, conf.AuthCodeURL(session.Get("state").(string)))
 			return
-		} else {
-			if c.Query("state") == session.Get("state") {
-				token, err := conf.Exchange(context.TODO(), code)
-				if err != nil {
-					env.Red.Println("ISSUE EXCHANGING CODE:", err)
-				}
-
-				client := conf.Client(context.TODO(), token)
-
-				resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
-				if err != nil {
-					env.Red.Println("ERROR GETTING USER INFO", err)
-				}
-				defer resp.Body.Close()
-
-				userData := make(map[string]interface{})
-
-				data, _ := ioutil.ReadAll(resp.Body)
-
-				err = json.Unmarshal(data, &userData)
-				if err != nil {
-					env.Red.Println("Unable to unmarshal user info from google", err)
-				}
-
-				var user config.User
-				var userCount int
-
-				env.DB.Table("users").Count(&userCount)
-				env.DB.First(&user, "email = ?", userData["email"].(string))
-
-				if userCount == 0 {
-					user.Admin = true
-				}
-
-				user.Email = userData["email"].(string)
-				user.AuthToken = token.AccessToken
-
-				if user.AuthorizedHosts == "" {
-					user.AuthorizedHosts = env.Config.DefaultHosts
-				}
-
-				env.DB.Save(&user)
-
-				if user.Cert != nil {
-					user.Cert = []byte{}
-					user.PrivateKey = []byte{}
-				}
-
-				session.Set("user", user)
-				session.Set("loggedin", true)
-				session.Save()
-
-				c.Redirect(http.StatusFound, "/sessions")
-				return
-			} else {
-				c.Redirect(http.StatusFound, "/")
-				return
-			}
 		}
+
+		if c.Query("state") == session.Get("state") {
+			token, err := conf.Exchange(context.TODO(), code)
+			if err != nil {
+				env.Red.Println("ISSUE EXCHANGING CODE:", err)
+			}
+
+			client := conf.Client(context.TODO(), token)
+
+			resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+			if err != nil {
+				env.Red.Println("ERROR GETTING USER INFO", err)
+			}
+			defer resp.Body.Close()
+
+			userData := make(map[string]interface{})
+
+			data, _ := ioutil.ReadAll(resp.Body)
+
+			err = json.Unmarshal(data, &userData)
+			if err != nil {
+				env.Red.Println("Unable to unmarshal user info from google", err)
+			}
+
+			var user config.User
+			var userCount int
+
+			env.DB.Table("users").Count(&userCount)
+			env.DB.First(&user, "email = ?", userData["email"].(string))
+
+			if userCount == 0 {
+				user.Admin = true
+			}
+
+			user.Email = userData["email"].(string)
+			user.AuthToken = token.AccessToken
+
+			if user.AuthorizedHosts == "" {
+				user.AuthorizedHosts = env.Config.DefaultHosts
+			}
+
+			env.DB.Save(&user)
+
+			if user.Cert != nil {
+				user.Cert = []byte{}
+				user.PrivateKey = []byte{}
+			}
+
+			session.Set("user", user)
+			session.Set("loggedin", true)
+			session.Save()
+
+			c.Redirect(http.StatusFound, "/sessions")
+			return
+		}
+
+		c.Redirect(http.StatusFound, "/")
+		return
 	}
 }
 
@@ -139,7 +140,7 @@ func session(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func sessionId(env *config.Env) func(c *gin.Context) {
+func sessionID(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id, _ := c.Params.Get("id")
 		ctx := context.Background()
@@ -161,20 +162,20 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
 		var newSessions []interface{}
-		env.SshProxyClients.Range(func(key interface{}, value interface{}) bool {
-			client := value.(*config.SshProxyClient)
+		env.SSHProxyClients.Range(func(key interface{}, value interface{}) bool {
+			client := value.(*config.SSHProxyClient)
 
 			client.Mutex.Lock()
-			if client.SshServerClient.User != nil && len(client.SshShellSessions) > 0 {
+			if client.SSHServerClient.User != nil && len(client.SSHShellSessions) > 0 {
 				sessionData := make(map[string]interface{})
 				sessionData["Name"] = key.(string)
-				sessionData["Host"] = client.SshServerClient.ProxyTo
-				sessionData["Hostname"] = client.SshServerClient.ProxyToHostname
-				sessionData["User"] = client.SshServerClient.User.Email
-				sessionData["Sessions"] = len(client.SshShellSessions)
+				sessionData["Host"] = client.SSHServerClient.ProxyTo
+				sessionData["Hostname"] = client.SSHServerClient.ProxyToHostname
+				sessionData["User"] = client.SSHServerClient.User.Email
+				sessionData["Sessions"] = len(client.SSHShellSessions)
 				wholeCommand := ""
 
-				for _, v := range client.SshShellSessions {
+				for _, v := range client.SSHShellSessions {
 					for _, r := range v.Reqs {
 						if r.ReqType == "shell" || r.ReqType == "exec" {
 							command := ""
@@ -209,14 +210,14 @@ func openSessions(env *config.Env) func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
 		var newSessions []interface{}
-		env.SshProxyClients.Range(func(key interface{}, value interface{}) bool {
-			client := value.(*config.SshProxyClient)
+		env.SSHProxyClients.Range(func(key interface{}, value interface{}) bool {
+			client := value.(*config.SSHProxyClient)
 
 			sessionData := make(map[string]interface{})
 			allChans := make([]map[string]interface{}, 0)
 			sessionData["name"] = key.(string)
 
-			for _, v2 := range client.SshChans {
+			for _, v2 := range client.SSHChans {
 				chanData := make(map[string]interface{})
 				chanData["reqs"] = v2.Reqs
 				chanData["data"] = v2.ChannelData
@@ -252,8 +253,8 @@ func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 			sidKey = ""
 		}
 
-		if proxyClientInterface, ok := env.SshProxyClients.Load(pathKey); ok {
-			proxyClient := proxyClientInterface.(*config.SshProxyClient)
+		if proxyClientInterface, ok := env.SSHProxyClients.Load(pathKey); ok {
+			proxyClient := proxyClientInterface.(*config.SSHProxyClient)
 			place := 0
 			var err error
 			if sidKey != "" {
@@ -263,9 +264,9 @@ func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 				}
 			}
 
-			if place < len(proxyClient.SshShellSessions) {
+			if place < len(proxyClient.SSHShellSessions) {
 				proxyClient.Mutex.Lock()
-				chanInfo := proxyClient.SshShellSessions[place]
+				chanInfo := proxyClient.SSHShellSessions[place]
 				proxyClient.Mutex.Unlock()
 
 				proxyChan := *chanInfo.ProxyChan
@@ -308,20 +309,20 @@ func liveSessionWS(env *config.Env) func(c *gin.Context) {
 			return
 		}
 
-		if proxyClientInterface, ok := env.SshProxyClients.Load(pathKey); ok {
-			proxyClient := proxyClientInterface.(*config.SshProxyClient)
+		if proxyClientInterface, ok := env.SSHProxyClients.Load(pathKey); ok {
+			proxyClient := proxyClientInterface.(*config.SSHProxyClient)
 			place := 0
 			if sidKey != "" {
 				place, err = strconv.Atoi(sidKey)
 			}
 
-			if place < len(proxyClient.SshShellSessions) {
+			if place < len(proxyClient.SSHShellSessions) {
 				clientMapInterface, _ := env.WebsocketClients.LoadOrStore(pathKey+sidKey, make(map[string]*config.WsClient))
 
 				proxyClient.Mutex.Lock()
 				clientMap := clientMapInterface.(map[string]*config.WsClient)
 
-				chanInfo := proxyClient.SshShellSessions[place]
+				chanInfo := proxyClient.SSHShellSessions[place]
 
 				clientMap[conn.RemoteAddr().String()] = &config.WsClient{
 					Client: conn,
@@ -353,21 +354,21 @@ func liveSessionWS(env *config.Env) func(c *gin.Context) {
 				break
 			}
 
-			if proxyClientInterface, ok := env.SshProxyClients.Load(pathKey); ok {
-				proxyClient := proxyClientInterface.(*config.SshProxyClient)
+			if proxyClientInterface, ok := env.SSHProxyClients.Load(pathKey); ok {
+				proxyClient := proxyClientInterface.(*config.SSHProxyClient)
 				place := 0
 				if sidKey != "" {
 					place, err = strconv.Atoi(sidKey)
 				}
 
-				if place < len(proxyClient.SshShellSessions) {
-					sshProxyClient := *proxyClient.SshShellSessions[place].ProxyChan
+				if place < len(proxyClient.SSHShellSessions) {
+					SSHProxyClient := *proxyClient.SSHShellSessions[place].ProxyChan
 
-					if sshProxyClient != nil {
-						proxyClient.SshShellSessions[place].Closer.Mutex.Lock()
-						proxyClient.SshShellSessions[place].Closer.CurrentUser = userData.Email
-						proxyClient.SshShellSessions[place].Closer.Mutex.Unlock()
-						_, err = sshProxyClient.Write(p)
+					if SSHProxyClient != nil {
+						proxyClient.SSHShellSessions[place].Closer.Mutex.Lock()
+						proxyClient.SSHShellSessions[place].Closer.CurrentUser = userData.Email
+						proxyClient.SSHShellSessions[place].Closer.Mutex.Unlock()
+						_, err = SSHProxyClient.Write(p)
 
 						if err != nil {
 							env.Red.Println("SSH Session Write Error:", err)

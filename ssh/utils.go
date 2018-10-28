@@ -8,11 +8,12 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/notion/trove_ssh_bastion/config"
-	"golang.org/x/crypto/ssh"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/notion/trove_ssh_bastion/config"
+	"golang.org/x/crypto/ssh"
 )
 
 var sshPermissions = map[string]string{
@@ -23,6 +24,7 @@ var sshPermissions = map[string]string{
 	"permit-user-rc":          "",
 }
 
+// CASigner is the main CASigner object
 type CASigner struct {
 	CA          ssh.Signer
 	Validity    time.Duration
@@ -30,6 +32,7 @@ type CASigner struct {
 	Permissions []string
 }
 
+// Sign creates a certificate that has been signed by the CASigner
 func (s *CASigner) Sign(env *config.Env, user string, pubKey ssh.PublicKey) (*ssh.Certificate, []byte, error) {
 	var privateKey []byte
 	if pubKey == nil {
@@ -80,6 +83,7 @@ func (s *CASigner) Sign(env *config.Env, user string, pubKey ssh.PublicKey) (*ss
 	return cert, privateKey, nil
 }
 
+// NewCASigner creates a CASigner from different certificate settings
 func NewCASigner(sshsigner ssh.Signer, expireIn time.Duration, principals []string, permissions []string) *CASigner {
 	signer := &CASigner{
 		CA:          sshsigner,
@@ -124,6 +128,7 @@ func createPrivateKey(env *config.Env, addToEnv bool, passphrase string) []byte 
 	return pemData
 }
 
+// ParsePrivateKey pareses the PrivateKey into a ssh.Signer and let's it be used by CASigner
 func ParsePrivateKey(pk []byte, passphrase string, env *config.Env) ssh.Signer {
 	var signer ssh.Signer
 	var err error
