@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -11,7 +12,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/sqlite" // Load SQLite for GORM
+	_ "github.com/jinzhu/gorm/dialects/mysql" // Load MySQL for GORM
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -22,9 +23,9 @@ import (
 type Config struct {
 	gorm.Model
 	Expires          string `gorm:"default:'48h'"`
-	PrivateKey       []byte
-	UserPrivateKey   []byte
-	ServerPrivateKey []byte
+	PrivateKey       []byte `gorm:"type:varbinary(4096);"`
+	UserPrivateKey   []byte `gorm:"type:varbinary(4096);"`
+	ServerPrivateKey []byte `gorm:"type:varbinary(4096);"`
 	DefaultHosts     string `gorm:"type:MEDIUMTEXT;"`
 }
 
@@ -34,8 +35,8 @@ type User struct {
 	Email           string `gorm:"type:varchar(255);"`
 	AuthToken       string `gorm:"type:MEDIUMTEXT;"`
 	CertExpires     time.Time
-	Cert            []byte
-	PrivateKey      []byte
+	Cert            []byte `gorm:"type:varbinary(4096);"`
+	PrivateKey      []byte `gorm:"type:varbinary(4096);"`
 	Authorized      bool   `gorm:"default:false"`
 	AuthorizedHosts string `gorm:"type:MEDIUMTEXT;"`
 	Admin           bool   `gorm:"default:false"`
@@ -136,7 +137,7 @@ func Load(forceCerts bool) *Env {
 	blue := NewColorLog(color.New(color.FgBlue))
 	magenta := NewColorLog(color.New(color.FgMagenta))
 
-	db, err := gorm.Open("sqlite3", "trove_ssh_bastion.db")
+	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", vconfig.GetString("dbinfo.user"), vconfig.GetString("dbinfo.pass"), vconfig.GetString("dbinfo.host"), vconfig.GetString("dbinfo.port"), vconfig.GetString("dbinfo.name")))
 	if err != nil {
 		red.Println("Error loading config:", err)
 	}
