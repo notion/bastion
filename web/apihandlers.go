@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
+
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/securecookie"
@@ -27,13 +29,102 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var signer cryptossh.Signer
-var casigner *ssh.CASigner
+var (
+	signer      cryptossh.Signer
+	casigner    *ssh.CASigner
+	keys        = make(map[string]string)
+	keyLoadTime time.Time
+)
 
 func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		code := c.Query("code")
 		session := sessions.Default(c)
+
+		if env.GCE {
+			if int(time.Now().Sub(keyLoadTime).Seconds()) > 60 {
+				keyLoadTime = time.Now()
+
+				resp, err := http.Get("https://www.gstatic.com/iap/verify/public_key")
+				if err != nil {
+					env.Red.Println(err)
+				}
+				defer resp.Body.Close()
+
+				body, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					env.Red.Println(err)
+				}
+
+				err = json.Unmarshal(body, &keys)
+				if err != nil {
+					env.Red.Println(err)
+				}
+			}
+
+			if c.GetHeader("x-goog-iap-jwt-assertion") != "" {
+				token, err := jwt.Parse(c.GetHeader("x-goog-iap-jwt-assertion"), func(token *jwt.Token) (interface{}, error) {
+					if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
+						return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+					}
+
+					key, err := jwt.ParseECPublicKeyFromPEM([]byte(keys[token.Header["kid"].(string)]))
+					if err != nil {
+						env.Red.Println(err)
+					}
+
+					return key, nil
+				})
+				if err != nil {
+					env.Red.Println(err)
+				}
+
+				if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+					if claims.VerifyAudience(env.Vconfig.GetString("gce.iap.aud"), true) && claims.VerifyIssuer(env.Vconfig.GetString("gce.iap.issuer"), true) {
+						if hd, ok := claims["hd"].(string); ok {
+							for _, v := range env.Vconfig.GetStringSlice("gce.iap.hd") {
+								if v == hd {
+									var user config.User
+									var userCount int
+
+									env.DB.Table("users").Count(&userCount)
+									env.DB.First(&user, "email = ?", claims["email"].(string))
+
+									if userCount == 0 {
+										user.Admin = true
+									}
+
+									user.Email = claims["email"].(string)
+
+									if user.AuthorizedHosts == "" {
+										user.AuthorizedHosts = env.Config.DefaultHosts
+									}
+
+									env.DB.Save(&user)
+
+									if user.Cert != nil {
+										user.Cert = []byte{}
+										user.PrivateKey = []byte{}
+									}
+
+									session.Set("user", user)
+									session.Set("loggedin", true)
+									session.Save()
+
+									c.Redirect(http.StatusFound, "/sessions")
+									return
+								}
+							}
+						}
+					}
+				} else {
+					env.Red.Println(err)
+				}
+			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, map[string]interface{}{"status": false})
+			return
+		}
+
+		code := c.Query("code")
 
 		if code == "" {
 			if loggedIn := session.Get("loggedin"); loggedIn != nil {
@@ -170,6 +261,7 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 			if client.SSHServerClient.User != nil && len(client.SSHShellSessions) > 0 {
 				sessionData := make(map[string]interface{})
 				sessionData["Name"] = serverClient.Client.RemoteAddr().String()
+				sessionData["WS"] = key.(string)
 				sessionData["Host"] = client.SSHServerClient.ProxyTo
 				sessionData["Hostname"] = client.SSHServerClient.ProxyToHostname
 				sessionData["User"] = client.SSHServerClient.User.Email

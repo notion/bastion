@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -126,7 +125,7 @@ type ConnChan struct {
 var configFile = "config.yml"
 
 // Load initializes the Env pointer with data from the database and elsewhere
-func Load(forceCerts bool, gce bool) *Env {
+func Load(forceCerts bool) *Env {
 	vconfig := viper.New()
 
 	vconfig.SetConfigFile(configFile)
@@ -142,7 +141,7 @@ func Load(forceCerts bool, gce bool) *Env {
 	if err != nil {
 		red.Println("Error loading config:", err)
 	}
-	db.LogMode(os.Getenv("DEBUG") == "true")
+	db.LogMode(vconfig.GetBool("debug"))
 
 	db.AutoMigrate(&Config{}, &User{}, &Session{})
 
@@ -160,16 +159,13 @@ func Load(forceCerts bool, gce bool) *Env {
 		red.Println("Error initializing google cloud storage", err)
 	}
 
-	bucketName := os.Getenv("BUCKET_NAME")
-	if bucketName == "" {
-		bucketName = "***REMOVED***"
-	}
+	bucketName := vconfig.GetString("gce.bucket")
 	logsBucket := storageClient.Bucket(bucketName)
 
 	return &Env{
-		GCE:              gce,
+		GCE:              vconfig.GetBool("gce.enabled"),
 		ForceGeneration:  forceCerts,
-		PKPassphrase:     os.Getenv("PKPASSPHRASE"),
+		PKPassphrase:     vconfig.GetString("pkpassphrase"),
 		SSHServerClients: &sync.Map{},
 		SSHProxyClients:  &sync.Map{},
 		WebsocketClients: &sync.Map{},

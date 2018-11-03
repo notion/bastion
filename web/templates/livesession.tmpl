@@ -102,8 +102,8 @@
                     var disconnectButtons = '';
 
                     for(var i = 0; i < parseInt(session.Sessions); i++) {
-                        buttons += `<button onclick="playCast('${session.Name}', ${i})" class="btn btn-sm btn-primary">Join ${i}</button>    `;
-                        disconnectButtons += `<button onclick="disconnectSession('${session.Name}', ${i})" class="btn btn-sm btn-danger">Disconnect ${i}</button>`
+                        buttons += `<button onclick="playCast('${session.WS}', ${i})" class="btn btn-sm btn-primary">Join ${i}</button>    `;
+                        disconnectButtons += `<button onclick="disconnectSession('${session.WS}', ${i})" class="btn btn-sm btn-danger">Disconnect ${i}</button>`
                     }
 
                     $("#sessions-table > tbody").append(`

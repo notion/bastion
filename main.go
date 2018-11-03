@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	gce          = flag.Bool("gce", false, "Tells the bastion that it is running on GCE with Identity-Aware-Proxy/Instance Groups/TCP Load balancing/Autoscaling enabled. This disables native oAuth and verifies IAP headers. It also set's the PROXY protocol headers for a TCP loadbalancer and enables sharing of livesessions")
 	webAddr      = flag.String("web.addr", ":8080", "The address to listen for http connections on")
 	sshAddr      = flag.String("ssh.addr", ":5222", "The address to listen for ssh connections on")
 	sshProxyAddr = flag.String("ssh.proxy.addr", "localhost:22222", "The address to listen for ssh proxy connections on")
@@ -21,7 +20,7 @@ var (
 func main() {
 	flag.Parse()
 
-	env := config.Load(*forceCerts, *gce)
+	env := config.Load(*forceCerts)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill)

@@ -18,7 +18,7 @@ var (
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
 
-	store = cookie.NewStore([]byte("test"))
+	store = cookie.NewStore([]byte("s0secure"))
 )
 
 // Serve Starts the web server and all of its handlers
