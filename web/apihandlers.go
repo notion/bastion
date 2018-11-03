@@ -164,11 +164,12 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 		var newSessions []interface{}
 		env.SSHProxyClients.Range(func(key interface{}, value interface{}) bool {
 			client := value.(*config.SSHProxyClient)
+			serverClient := client.SSHServerClient
 
 			client.Mutex.Lock()
 			if client.SSHServerClient.User != nil && len(client.SSHShellSessions) > 0 {
 				sessionData := make(map[string]interface{})
-				sessionData["Name"] = key.(string)
+				sessionData["Name"] = serverClient.Client.RemoteAddr().String()
 				sessionData["Host"] = client.SSHServerClient.ProxyTo
 				sessionData["Hostname"] = client.SSHServerClient.ProxyToHostname
 				sessionData["User"] = client.SSHServerClient.User.Email

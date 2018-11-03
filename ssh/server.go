@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/notion/trove_ssh_bastion/proxyprotocol"
+
 	"github.com/notion/trove_ssh_bastion/config"
 	"golang.org/x/crypto/ssh"
 )
@@ -72,7 +74,14 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 			continue
 		}
 
-		SSHConn, chans, reqs, err := ssh.NewServerConn(tcpConn, sshConfig)
+		var proxConn net.Conn
+		if env.GCE {
+			proxConn = proxyprotocol.ParseConn(tcpConn)
+		} else {
+			proxConn = tcpConn
+		}
+
+		SSHConn, chans, reqs, err := ssh.NewServerConn(proxConn, sshConfig)
 		if err != nil {
 			env.Red.Printf("Failed to handshake (%s)", err)
 			continue

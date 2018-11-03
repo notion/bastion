@@ -59,6 +59,7 @@ type Session struct {
 
 // Env is our main context. A pointer of this is passed almost everywhere
 type Env struct {
+	GCE              bool
 	ForceGeneration  bool
 	PKPassphrase     string
 	SSHServerClients *sync.Map
@@ -125,7 +126,7 @@ type ConnChan struct {
 var configFile = "config.yml"
 
 // Load initializes the Env pointer with data from the database and elsewhere
-func Load(forceCerts bool) *Env {
+func Load(forceCerts bool, gce bool) *Env {
 	vconfig := viper.New()
 
 	vconfig.SetConfigFile(configFile)
@@ -166,6 +167,7 @@ func Load(forceCerts bool) *Env {
 	logsBucket := storageClient.Bucket(bucketName)
 
 	return &Env{
+		GCE:              gce,
 		ForceGeneration:  forceCerts,
 		PKPassphrase:     os.Getenv("PKPASSPHRASE"),
 		SSHServerClients: &sync.Map{},

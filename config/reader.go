@@ -35,12 +35,25 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 		ChanInfo: chanInfo,
 	}
 
+	if val, ok := env.SSHProxyClients.Load(conn.RemoteAddr().String()); ok {
+		client := val.(*SSHProxyClient)
+		chanInfo.Closer = closer
+		client.Mutex.Lock()
+		closer.SidKey = strconv.Itoa(len(client.SSHShellSessions))
+		client.Mutex.Unlock()
+		closer.User = client.SSHServerClient.User
+		closer.Host = client.SSHServerClient.ProxyTo
+		closer.Hostname = client.SSHServerClient.ProxyToHostname
+		closer.Name = client.SSHServerClient.Client.RemoteAddr().String()
+		closer.Users = closer.User.Email
+	}
+
 	if env.LogsBucket != nil {
 		bkt := env.LogsBucket
 
 		ctx := context.Background()
 
-		objHandler := bkt.Object(closer.Time.Format("2006-01-02 15:04:05") + " " + conn.RemoteAddr().String())
+		objHandler := bkt.Object(closer.Time.Format("2006-01-02 15:04:05") + " " + closer.Name)
 		w := objHandler.NewWriter(ctx)
 
 		closer.BkWriter = w
@@ -61,19 +74,6 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 		}
 	}
 
-	if val, ok := env.SSHProxyClients.Load(conn.RemoteAddr().String()); ok {
-		client := val.(*SSHProxyClient)
-		chanInfo.Closer = closer
-		client.Mutex.Lock()
-		closer.SidKey = strconv.Itoa(len(client.SSHShellSessions))
-		client.Mutex.Unlock()
-		closer.User = client.SSHServerClient.User
-		closer.Host = client.SSHServerClient.ProxyTo
-		closer.Hostname = client.SSHServerClient.ProxyToHostname
-
-		closer.Users = closer.User.Email
-	}
-
 	return closer
 }
 
@@ -81,6 +81,7 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 type AsciicastReadCloser struct {
 	io.ReadCloser
 
+	Name        string
 	SSHConn     ssh.ConnMetadata
 	Cast        *asciicast.Cast
 	Time        time.Time

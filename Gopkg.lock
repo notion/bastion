@@ -247,6 +247,14 @@
   version = "v1.2.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:57e13d10425e24333e3c6df6915fd5dd54aaa533a4a3e336208c2b4cb8405b6d"
+  name = "github.com/pires/go-proxyproto"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "2f38359974ffed92842a86ffcc17001b3f525e34"
+
+[[projects]]
   digest = "1:6a4a11ba764a56d2758899ec6f3848d24698d48442ebce85ee7a3f63284526cd"
   name = "github.com/spf13/afero"
   packages = [
@@ -514,6 +522,7 @@
     "github.com/gorilla/websocket",
     "github.com/jinzhu/gorm",
     "github.com/jinzhu/gorm/dialects/mysql",
+    "github.com/pires/go-proxyproto",
     "github.com/spf13/viper",
     "golang.org/x/crypto/ssh",
     "golang.org/x/crypto/ssh/agent",
