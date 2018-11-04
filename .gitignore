@@ -4,3 +4,4 @@
 *.cast
 build/
 config.yml
+credentials.json
