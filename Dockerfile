@@ -1,5 +1,5 @@
 FROM golang:latest
-LABEL maintainer="Antonio Mika <antonio@***REMOVED***>"
+LABEL maintainer="Antonio Mika <me@antoniomika.me>"
 
 WORKDIR /usr/local/go/src/github.com/notion/trove_ssh_bastion
 COPY . .
