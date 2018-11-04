@@ -222,6 +222,10 @@ func (lr *AsciicastReadCloser) Close() error {
 
 	lr.Env.DB.Save(session)
 
+	if lr.Env.GCE {
+		lr.Env.DB.Delete(&LiveSession{}, lr.ChanInfo.DBID)
+	}
+
 	err = lr.GZWriter.Close()
 	err = lr.BkWriter.Close()
 	if err != nil {

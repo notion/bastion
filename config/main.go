@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/fatih/color"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql" // Load MySQL for GORM
@@ -56,6 +57,21 @@ type Session struct {
 	Command  string `gorm:"type:MEDIUMTEXT;"`
 }
 
+// LiveSession is the model for a specific live SSH session
+type LiveSession struct {
+	gorm.Model
+	Name     string `gorm:"type:MEDIUMTEXT;"`
+	WS       string `gorm:"type:MEDIUMTEXT;"`
+	Time     time.Time
+	UserID   uint
+	User     *User
+	Host     string `gorm:"type:MEDIUMTEXT;"`
+	Hostname string `gorm:"type:MEDIUMTEXT;"`
+	Command  string `gorm:"type:MEDIUMTEXT;"`
+	Bastion  string `gorm:"type:MEDIUMTEXT;"`
+	AuthCode string `gorm:"type:MEDIUMTEXT;"`
+}
+
 // Env is our main context. A pointer of this is passed almost everywhere
 type Env struct {
 	GCE              bool
@@ -73,6 +89,9 @@ type Env struct {
 	Yellow           *ColorLog
 	Blue             *ColorLog
 	Magenta          *ColorLog
+	SSHPort          string
+	SSHProxyPort     string
+	HTTPPort         string
 }
 
 // WsClient is a struct that contains a websockets underlying data object
@@ -120,6 +139,7 @@ type ConnChan struct {
 	ProxyChan   *ssh.Channel
 	ClientChan  *ssh.Channel
 	Closer      *AsciicastReadCloser
+	DBID        uint
 }
 
 var configFile = "config.yml"
@@ -143,7 +163,13 @@ func Load(forceCerts bool) *Env {
 	}
 	db.LogMode(vconfig.GetBool("debug"))
 
-	db.AutoMigrate(&Config{}, &User{}, &Session{})
+	releaseMode := gin.ReleaseMode
+	if vconfig.GetBool("debug") {
+		releaseMode = gin.DebugMode
+	}
+	gin.SetMode(releaseMode)
+
+	db.AutoMigrate(&Config{}, &User{}, &Session{}, &LiveSession{})
 
 	var config Config
 

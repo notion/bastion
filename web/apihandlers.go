@@ -13,10 +13,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"strconv"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/koding/websocketproxy"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -252,6 +254,43 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
+		if env.GCE {
+			var livesessions []config.LiveSession
+			env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
+				return db.Select([]string{"id", "email"})
+			}).Select([]string{"user_id", "time", "name", "host", "hostname", "ws", "command"}).Find(&livesessions)
+
+			sessions := make(map[string]int)
+			for _, v := range livesessions {
+				if _, ok := sessions[v.Name]; ok {
+					sessions[v.Name]++
+				} else {
+					sessions[v.Name] = 1
+				}
+			}
+
+			var newSessions []interface{}
+			for _, v := range livesessions {
+				newSessions = append(newSessions, map[string]interface{}{
+					"Name":     v.Name,
+					"WS":       v.WS,
+					"Host":     v.Host,
+					"Hostname": v.Hostname,
+					"User":     v.User.Email,
+					"Sessions": sessions[v.Name],
+					"Command":  v.Command,
+				})
+			}
+
+			retData := make(map[string]interface{})
+
+			retData["status"] = "ok"
+			retData["livesessions"] = newSessions
+
+			c.JSON(http.StatusOK, retData)
+			return
+		}
+
 		var newSessions []interface{}
 		env.SSHProxyClients.Range(func(key interface{}, value interface{}) bool {
 			client := value.(*config.SSHProxyClient)
@@ -346,6 +385,31 @@ func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 			sidKey = ""
 		}
 
+		authcode := c.Query("authcode")
+
+		if env.GCE {
+			var dblivesession config.LiveSession
+			env.DB.First(&dblivesession, "WS = ?", pathKey)
+			if authcode == "" {
+				newURL := c.Request.URL
+				newURL.Scheme = "http"
+				newURL.Host = dblivesession.Bastion
+				newURL.RawQuery = fmt.Sprintf("authcode=%s", dblivesession.AuthCode)
+
+				rProxy := &httputil.ReverseProxy{
+					Director: func(req *http.Request) {
+						req.URL = newURL
+					},
+				}
+				rProxy.ServeHTTP(c.Writer, c.Request)
+				return
+			}
+
+			if authcode != dblivesession.AuthCode {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, map[string]interface{}{"status": false, "error": "Invalid auth code."})
+			}
+		}
+
 		if proxyClientInterface, ok := env.SSHProxyClients.Load(pathKey); ok {
 			proxyClient := proxyClientInterface.(*config.SSHProxyClient)
 			place := 0
@@ -390,6 +454,27 @@ func liveSessionWS(env *config.Env) func(c *gin.Context) {
 		sidKey, ok := c.Params.Get("sid")
 		if !ok {
 			sidKey = ""
+		}
+
+		authcode := c.Query("authcode")
+
+		if env.GCE {
+			var dblivesession config.LiveSession
+			env.DB.First(&dblivesession, "WS = ?", pathKey)
+			if authcode == "" {
+				newURL := c.Request.URL
+				newURL.Scheme = "ws"
+				newURL.Host = dblivesession.Bastion
+				newURL.RawQuery = fmt.Sprintf("authcode=%s", dblivesession.AuthCode)
+
+				WSProxy := websocketproxy.NewProxy(newURL)
+				WSProxy.ServeHTTP(c.Writer, c.Request)
+				return
+			}
+
+			if authcode != dblivesession.AuthCode {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, map[string]interface{}{"status": false, "error": "Invalid auth code."})
+			}
 		}
 
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)

@@ -21,6 +21,9 @@ func main() {
 	flag.Parse()
 
 	env := config.Load(*forceCerts)
+	env.HTTPPort = *webAddr
+	env.SSHPort = *sshAddr
+	env.SSHProxyPort = *sshProxyAddr
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill)

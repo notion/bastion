@@ -199,6 +199,14 @@
   version = "v1.1.5"
 
 [[projects]]
+  branch = "master"
+  digest = "1:73405a734b6495d7ff09ff24a86633b56bc13917ea9adef16f3d8cccaea176c2"
+  name = "github.com/koding/websocketproxy"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "0fa3f994f6e724d94f7299587cee4ba089152c9d"
+
+[[projects]]
   digest = "1:c568d7727aa262c32bdf8a3f7db83614f7af0ed661474b24588de635c20024c7"
   name = "github.com/magiconair/properties"
   packages = ["."]
@@ -531,6 +539,7 @@
     "github.com/gorilla/websocket",
     "github.com/jinzhu/gorm",
     "github.com/jinzhu/gorm/dialects/mysql",
+    "github.com/koding/websocketproxy",
     "github.com/pires/go-proxyproto",
     "github.com/spf13/viper",
     "golang.org/x/crypto/ssh",

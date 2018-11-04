@@ -102,6 +102,42 @@ func (p *ProxyHandler) Serve() {
 					meta.Mutex.Lock()
 					meta.SSHShellSessions = append(meta.SSHShellSessions, chanInfo)
 					meta.Mutex.Unlock()
+
+					if p.env.GCE {
+						wholeCommand := ""
+
+						for _, r := range chanInfo.Reqs {
+							if r.ReqType == "shell" || r.ReqType == "exec" {
+								command := ""
+								if string(r.ReqData) == "" {
+									command = "Main Shell"
+								} else {
+									command = string(r.ReqData)
+								}
+
+								wholeCommand += command + ", "
+								break
+							}
+						}
+
+						livesession := &config.LiveSession{
+							Name:     meta.SSHServerClient.Client.RemoteAddr().String(),
+							Time:     time.Now(),
+							Host:     meta.SSHServerClient.ProxyTo,
+							Hostname: meta.SSHServerClient.ProxyToHostname,
+							Command:  wholeCommand,
+							AuthCode: RandStringBytesMaskImprSrc(20),
+							WS:       p.RemoteAddr().String(),
+							Bastion:  GetOutboundIP().String() + p.env.HTTPPort,
+						}
+
+						if meta.SSHServerClient.User != nil {
+							livesession.UserID = meta.SSHServerClient.User.ID
+						}
+
+						p.env.DB.Save(livesession)
+						chanInfo.DBID = livesession.ID
+					}
 				case "exit-status":
 					break r
 				}
