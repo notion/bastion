@@ -12,7 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/mysql" // Load MySQL for GORM
+	_ "github.com/jinzhu/gorm/dialects/mysql"  // Load MySQL for GORM
+	_ "github.com/jinzhu/gorm/dialects/sqlite" // Load SQLite for GORM
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -157,7 +158,14 @@ func Load(forceCerts bool) *Env {
 	blue := NewColorLog(color.New(color.FgBlue))
 	magenta := NewColorLog(color.New(color.FgMagenta))
 
-	db, err := gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", vconfig.GetString("dbinfo.user"), vconfig.GetString("dbinfo.pass"), vconfig.GetString("dbinfo.host"), vconfig.GetString("dbinfo.port"), vconfig.GetString("dbinfo.name")))
+	var db *gorm.DB
+	var err error
+	if vconfig.GetBool("dbinfo.sqlite") {
+		db, err = gorm.Open("sqlite3", "bastion.db")
+	} else {
+		db, err = gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", vconfig.GetString("dbinfo.user"), vconfig.GetString("dbinfo.pass"), vconfig.GetString("dbinfo.host"), vconfig.GetString("dbinfo.port"), vconfig.GetString("dbinfo.name")))
+	}
+
 	if err != nil {
 		red.Println("Error loading config:", err)
 	}

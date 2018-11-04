@@ -1,0 +1,26 @@
+dbinfo:
+  host: localhost
+  name: example
+  pass: example
+  port: 3306
+  sqlite: true
+  user: example
+debug: true
+gce:
+  bucket: example-logs
+  enabled: true
+  iap:
+    aud: /projects/0000000000000/global/backendServices/000000000000000000
+    hd:
+    - example.com
+    issuer: https://cloud.google.com/iap
+oauthcredentials:
+  clientid: 0000000000000-foobar.apps.googleusercontent.com
+  clientsecret: foobar
+  endpoint:
+    authurl: https://accounts.google.com/o/oauth2/auth
+    tokenurl: https://accounts.google.com/o/oauth2/token
+  redirecturl: https://auth.example.com
+  scopes:
+  - https://www.googleapis.com/auth/userinfo.email
+pkpassphrase: ""
