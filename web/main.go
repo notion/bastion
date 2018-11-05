@@ -17,8 +17,6 @@ var (
 	upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
-
-	store = cookie.NewStore([]byte("s0secure"))
 )
 
 // Serve Starts the web server and all of its handlers
@@ -27,6 +25,7 @@ func Serve(addr string, env *config.Env) {
 	env.Vconfig.SetDefault("OauthCredentials", &oauthConfig)
 	env.Vconfig.UnmarshalKey("OauthCredentials", &oauthConfig)
 
+	store := cookie.NewStore([]byte(env.Vconfig.GetString("cookiesecret")))
 	store.Options(sessions.Options{
 		MaxAge: 1 * 60 * 60,
 	})

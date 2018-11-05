@@ -1,3 +1,4 @@
+cookiesecret: s0secure
 dbinfo:
   host: localhost
   name: example

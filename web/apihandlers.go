@@ -243,7 +243,11 @@ func sessionID(env *config.Env) func(c *gin.Context) {
 			c.Writer.WriteHeader(http.StatusNotFound)
 		} else {
 			c.Header("Content-Encoding", "gzip")
-			//c.Header("Transfer-Encoding", "gzip")
+
+			if !env.GCE {
+				c.Header("Transfer-Encoding", "gzip")
+			}
+
 			c.Writer.WriteHeader(http.StatusOK)
 			io.Copy(c.Writer, reader)
 		}
