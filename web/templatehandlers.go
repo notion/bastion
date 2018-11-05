@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/notion/trove_ssh_bastion/config"
+	"github.com/notion/bastion/config"
 )
 
 func sessionTempl(env *config.Env) func(c *gin.Context) {

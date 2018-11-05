@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/notion/trove_ssh_bastion/proxyprotocol"
+	"github.com/notion/bastion/proxyprotocol"
 
-	"github.com/notion/trove_ssh_bastion/config"
+	"github.com/notion/bastion/config"
 	"golang.org/x/crypto/ssh"
 )
 

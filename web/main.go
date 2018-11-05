@@ -9,7 +9,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/notion/trove_ssh_bastion/config"
+	"github.com/notion/bastion/config"
 	"golang.org/x/oauth2"
 )
 

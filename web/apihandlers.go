@@ -25,8 +25,8 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
-	"github.com/notion/trove_ssh_bastion/config"
-	"github.com/notion/trove_ssh_bastion/ssh"
+	"github.com/notion/bastion/config"
+	"github.com/notion/bastion/ssh"
 	cryptossh "golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )

@@ -5,9 +5,9 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/notion/trove_ssh_bastion/config"
-	"github.com/notion/trove_ssh_bastion/ssh"
-	"github.com/notion/trove_ssh_bastion/web"
+	"github.com/notion/bastion/config"
+	"github.com/notion/bastion/ssh"
+	"github.com/notion/bastion/web"
 )
 
 var (

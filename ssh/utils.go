@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/notion/trove_ssh_bastion/config"
+	"github.com/notion/bastion/config"
 	"golang.org/x/crypto/ssh"
 )
 

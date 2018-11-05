@@ -12,7 +12,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/gorilla/websocket"
-	"github.com/notion/trove_ssh_bastion/asciicast"
+	"github.com/notion/bastion/asciicast"
 	"golang.org/x/crypto/ssh"
 )
 

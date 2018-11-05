@@ -1,7 +1,7 @@
 package ssh
 
 import (
-	"github.com/notion/trove_ssh_bastion/config"
+	"github.com/notion/bastion/config"
 )
 
 // Serve handles initializing the SSH Server and Proxy
