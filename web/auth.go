@@ -30,7 +30,6 @@ func authMiddleware(env *config.Env) func(c *gin.Context) {
 			if auth.(bool) {
 				match, _ := regexp.MatchString("^\\/api\\/users\\/(.*)\\/keys$", c.Request.URL.Path)
 				if userData.Admin || passPathsIfAuthed[c.Request.URL.Path] || passPaths[c.Request.URL.Path] || match {
-					c.Next()
 					return
 				}
 
@@ -40,11 +39,10 @@ func authMiddleware(env *config.Env) func(c *gin.Context) {
 		}
 
 		if passPaths[c.Request.URL.Path] {
-			c.Next()
-		} else {
-			c.Redirect(http.StatusFound, "/")
+			return
 		}
 
+		c.Redirect(http.StatusFound, "/")
 		return
 	}
 }
