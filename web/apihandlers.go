@@ -368,8 +368,24 @@ func openSessions(env *config.Env) func(c *gin.Context) {
 			return true
 		})
 
+		var newClientSessions []interface{}
+		env.SSHServerClients.Range(func(key interface{}, value interface{}) bool {
+			client := value.(*config.SSHServerClient)
+
+			sessionData := make(map[string]interface{})
+
+			sessionData["client"] = client.Client.RemoteAddr()
+			sessionData["proxyto"] = client.ProxyTo
+			sessionData["proxytohostname"] = client.ProxyToHostname
+
+			newClientSessions = append(newClientSessions, sessionData)
+
+			return true
+		})
+
 		retData["status"] = "ok"
 		retData["livesessions"] = newSessions
+		retData["livesessions2"] = newClientSessions
 
 		c.JSON(http.StatusOK, retData)
 	}

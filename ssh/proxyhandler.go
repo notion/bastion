@@ -60,6 +60,11 @@ func (p *ProxyHandler) Serve() {
 		}
 		meta.SSHChans = append(meta.SSHChans, chanInfo)
 
+		closeParentChans := func() {
+			proxyChannel.Close()
+			clientChannel.Close()
+		}
+
 		go func() {
 
 		r:
@@ -143,8 +148,7 @@ func (p *ProxyHandler) Serve() {
 				}
 			}
 
-			proxyChannel.Close()
-			clientChannel.Close()
+			closeParentChans()
 		}()
 
 		var wrappedClientChannel io.ReadCloser = clientChannel
@@ -154,8 +158,7 @@ func (p *ProxyHandler) Serve() {
 			wrappedClientChannel.Close()
 			wrappedProxyChannel.Close()
 
-			proxyChannel.Close()
-			clientChannel.Close()
+			closeParentChans()
 		}
 
 		allClose := func() {
@@ -179,5 +182,11 @@ func (p *ProxyHandler) Serve() {
 		defer once.Do(allClose)
 	}
 
+	cleanup := func() {
+		clientConn.Close()
+		proxyConn.Close()
+	}
+
 	p.env.Magenta.Println("Closed proxy connection.")
+	cleanup()
 }
