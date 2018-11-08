@@ -148,6 +148,8 @@ func (p *ProxyHandler) Serve() {
 				}
 			}
 
+			timer := time.NewTimer(1 * time.Second)
+			<-timer.C
 			closeParentChans()
 		}()
 
