@@ -1,6 +1,7 @@
 package web
 
 import (
+	"html/template"
 	"net/http"
 
 	"github.com/gin-contrib/sessions"
@@ -48,5 +49,23 @@ func noaccessTempl(env *config.Env) func(c *gin.Context) {
 		}
 
 		c.HTML(http.StatusOK, "noaccess", userData)
+	}
+}
+
+func otpTempl(env *config.Env, templs *template.Template) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userData := session.Get("user").(*config.User)
+
+		c.HTML(http.StatusOK, "otp", userData)
+	}
+}
+
+func setupOtpTempl(env *config.Env, templs *template.Template) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userData := session.Get("user").(*config.User)
+
+		c.HTML(http.StatusOK, "otpsetup", userData)
 	}
 }

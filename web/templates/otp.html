@@ -1,0 +1,13 @@
+{{ define "otp" }}
+{{ template "header" .}}
+<div class="row">
+    <form id="updateForm" action="/api/otp" method="POST">
+        <div class="form-group">
+            <label for="code">OTP Code:</label>
+            <input type="text" class="form-control" id="code" placeholder="Code" name="code">
+        </div>
+        <button type="submit" class="btn btn-default">Submit</button>
+    </form>
+</div>
+{{ template "footer" .}}
+{{ end }}

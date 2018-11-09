@@ -110,6 +110,7 @@ func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 
 									session.Set("user", user)
 									session.Set("loggedin", true)
+									session.Set("otpauthed", false)
 									session.Save()
 
 									c.Redirect(http.StatusFound, "/sessions")
@@ -736,5 +737,33 @@ func downloadKey(env *config.Env) func(c *gin.Context) {
 		c.Header("Content-Type", "application/zip")
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"authorization.zip\""))
 		c.Writer.Write(buf.Bytes())
+	}
+}
+
+func otp(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		retData := make(map[string]interface{})
+		var users []config.User
+
+		env.DB.Find(&users)
+
+		retData["status"] = "ok"
+		retData["users"] = users
+
+		c.JSON(http.StatusOK, retData)
+	}
+}
+
+func setupotp(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		retData := make(map[string]interface{})
+		var users []config.User
+
+		env.DB.Find(&users)
+
+		retData["status"] = "ok"
+		retData["users"] = users
+
+		c.JSON(http.StatusOK, retData)
 	}
 }

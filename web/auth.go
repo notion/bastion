@@ -12,6 +12,8 @@ import (
 var (
 	passPathsIfAuthed = map[string]bool{
 		"/noaccess": true,
+		"/otp":      true,
+		"/setupotp": true,
 	}
 
 	passPaths = map[string]bool{
@@ -24,17 +26,20 @@ func authMiddleware(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 
-		if auth := session.Get("loggedin"); auth != nil {
+		auth := session.Get("loggedin")
+		if otpAuth := session.Get("otpauthed"); otpAuth != nil {
 			userData := session.Get("user").(*config.User)
 
-			if auth.(bool) {
-				match, _ := regexp.MatchString("^\\/api\\/users\\/(.*)\\/keys$", c.Request.URL.Path)
-				if userData.Admin || passPathsIfAuthed[c.Request.URL.Path] || passPaths[c.Request.URL.Path] || match {
+			if otpAuth.(bool) {
+				if auth.(bool) {
+					match, _ := regexp.MatchString("^\\/api\\/users\\/(.*)\\/keys$", c.Request.URL.Path)
+					if userData.Admin || passPathsIfAuthed[c.Request.URL.Path] || passPaths[c.Request.URL.Path] || match {
+						return
+					}
+
+					c.Redirect(http.StatusFound, "/noaccess")
 					return
 				}
-
-				c.Redirect(http.StatusFound, "/noaccess")
-				return
 			}
 		}
 

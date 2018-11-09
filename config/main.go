@@ -42,6 +42,7 @@ type User struct {
 	AuthorizedHosts string `gorm:"type:MEDIUMTEXT;"`
 	Admin           bool   `gorm:"default:false"`
 	UnixUser        string `gorm:"type:varchar(255);"`
+	OTPSecret       string `gorm:"type:varchar(255);"`
 }
 
 // Session is the model for a specific SSH sessions
