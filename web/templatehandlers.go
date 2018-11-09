@@ -1,7 +1,6 @@
 package web
 
 import (
-	"html/template"
 	"net/http"
 
 	"github.com/gin-contrib/sessions"
@@ -45,6 +44,7 @@ func noaccessTempl(env *config.Env) func(c *gin.Context) {
 
 		if env.DB.First(&fullUser, userData.ID).RecordNotFound() {
 			c.Redirect(http.StatusFound, "/")
+			c.Abort()
 			return
 		}
 
@@ -52,20 +52,34 @@ func noaccessTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func otpTempl(env *config.Env, templs *template.Template) func(c *gin.Context) {
+func otpTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
+
+		if userData.OTPSecret == "" {
+			c.Redirect(http.StatusFound, "/setupotp")
+			c.Abort()
+			return
+		}
 
 		c.HTML(http.StatusOK, "otp", userData)
 	}
 }
 
-func setupOtpTempl(env *config.Env, templs *template.Template) func(c *gin.Context) {
+func setupOtpTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
 
-		c.HTML(http.StatusOK, "otpsetup", userData)
+		if userData.OTPSecret != "" {
+			if otpAuthed := session.Get("otpauthed"); otpAuthed == nil || !otpAuthed.(bool) {
+				c.Redirect(http.StatusFound, "/otp")
+				c.Abort()
+				return
+			}
+		}
+
+		c.HTML(http.StatusOK, "setupotp", userData)
 	}
 }

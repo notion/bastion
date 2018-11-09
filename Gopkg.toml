@@ -68,3 +68,7 @@
 [[constraint]]
   branch = "master"
   name = "github.com/koding/websocketproxy"
+
+[[constraint]]
+  name = "github.com/pquerna/otp"
+  version = "1.0.0"

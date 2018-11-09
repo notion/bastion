@@ -26,6 +26,18 @@
   version = "v0.6.0"
 
 [[projects]]
+  digest = "1:7b94d37d65c0445053c6f3e73090e3966c1c29127035492c349e14f25c440359"
+  name = "github.com/boombuler/barcode"
+  packages = [
+    ".",
+    "qr",
+    "utils",
+  ]
+  pruneopts = "UT"
+  revision = "3cfea5ab600ae37946be2b763b8ec2c1cf2d272d"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:76dc72490af7174349349838f2fe118996381b31ea83243812a97e5a0fd5ed55"
   name = "github.com/dgrijalva/jwt-go"
   packages = ["."]
@@ -278,6 +290,18 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "2f38359974ffed92842a86ffcc17001b3f525e34"
+
+[[projects]]
+  digest = "1:6c7a3f738e37a1c7ad3d56122a34932140654d51a57e01f8613cdf3eaf050911"
+  name = "github.com/pquerna/otp"
+  packages = [
+    ".",
+    "hotp",
+    "totp",
+  ]
+  pruneopts = "UT"
+  revision = "b7b89250c468c06871d3837bee02e2d5c155ae19"
+  version = "v1.0.0"
 
 [[projects]]
   digest = "1:6a4a11ba764a56d2758899ec6f3848d24698d48442ebce85ee7a3f63284526cd"
@@ -551,6 +575,8 @@
     "github.com/jinzhu/gorm/dialects/sqlite",
     "github.com/koding/websocketproxy",
     "github.com/pires/go-proxyproto",
+    "github.com/pquerna/otp",
+    "github.com/pquerna/otp/totp",
     "github.com/spf13/viper",
     "golang.org/x/crypto/ssh",
     "golang.org/x/crypto/ssh/agent",

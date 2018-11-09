@@ -28,6 +28,7 @@ func Serve(addr string, env *config.Env) {
 	store := cookie.NewStore([]byte(env.Vconfig.GetString("cookiesecret")))
 	store.Options(sessions.Options{
 		MaxAge: 1 * 60 * 60,
+		Path:   "/",
 	})
 
 	gob.Register(&oauth2.Token{})
@@ -46,6 +47,8 @@ func Serve(addr string, env *config.Env) {
 		authedGroup.GET("/livesessions", liveSessionTempl(env))
 		authedGroup.GET("/users", userTempl(env))
 		authedGroup.GET("/noaccess", noaccessTempl(env))
+		authedGroup.GET("/otp", otpTempl(env))
+		authedGroup.GET("/setupotp", setupOtpTempl(env))
 
 		apiGroup := authedGroup.Group("/api")
 		{
@@ -66,6 +69,9 @@ func Serve(addr string, env *config.Env) {
 			apiGroup.GET("/disconnect/:id/:sid", disconnectLiveSession(env))
 			apiGroup.GET("/sessions", session(env))
 			apiGroup.GET("/sessions/:id", sessionID(env))
+
+			apiGroup.POST("/otp", checkOtp(env))
+			apiGroup.GET("/setupotp", setupotp(env))
 		}
 	}
 

@@ -1,11 +1,23 @@
 {{ define "setupotp" }}
 {{ template "header" .}}
+<script>
+    $(function() {
+        $.getJSON("/api/setupotp", function(data) {
+            $("#url").val(data["otpurl"]);
+            $("#qrcode").attr("src", data["imageurl"]);
+        });
+    });
+</script>
 <div class="row">
     <form id="updateForm" action="/api/otp" method="POST">
-        <img src="/api/setupotp">
+        <img id="qrcode">
         <div class="form-group">
             <label for="code">OTP Code:</label>
             <input type="text" class="form-control" id="code" placeholder="Code" name="code">
+        </div>
+        <div class="form-group">
+            <label for="url">OTP Url:</label>
+            <input type="text" class="form-control" id="url" placeholder="URL" name="url" readonly>
         </div>
         <button type="submit" class="btn btn-default">Submit</button>
     </form>

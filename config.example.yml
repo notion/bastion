@@ -24,4 +24,7 @@ oauthcredentials:
   redirecturl: https://auth.example.com
   scopes:
   - https://www.googleapis.com/auth/userinfo.email
+otp:
+  enabled: false
+  issuer: example.com
 pkpassphrase: ""

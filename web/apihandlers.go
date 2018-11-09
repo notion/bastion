@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -27,6 +28,8 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/notion/bastion/config"
 	"github.com/notion/bastion/ssh"
+	otp "github.com/pquerna/otp"
+	"github.com/pquerna/otp/totp"
 	cryptossh "golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -113,7 +116,14 @@ func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 									session.Set("otpauthed", false)
 									session.Save()
 
+									if env.Vconfig.GetBool("otp.enabled") {
+										c.Redirect(http.StatusFound, "/otp")
+										c.Abort()
+										return
+									}
+
 									c.Redirect(http.StatusFound, "/sessions")
+									c.Abort()
 									return
 								}
 							}
@@ -143,6 +153,7 @@ func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 			session.Save()
 
 			c.Redirect(http.StatusFound, conf.AuthCodeURL(session.Get("state").(string)))
+			c.Abort()
 			return
 		}
 
@@ -195,13 +206,22 @@ func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 
 			session.Set("user", user)
 			session.Set("loggedin", true)
+			session.Set("otpauthed", false)
 			session.Save()
 
+			if env.Vconfig.GetBool("otp.enabled") {
+				c.Redirect(http.StatusFound, "/otp")
+				c.Abort()
+				return
+			}
+
 			c.Redirect(http.StatusFound, "/sessions")
+			c.Abort()
 			return
 		}
 
 		c.Redirect(http.StatusFound, "/")
+		c.Abort()
 		return
 	}
 }
@@ -214,6 +234,7 @@ func logout(env *config.Env) func(c *gin.Context) {
 		session.Save()
 
 		c.Redirect(http.StatusFound, "/")
+		c.Abort()
 		return
 	}
 }
@@ -740,29 +761,92 @@ func downloadKey(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func otp(env *config.Env) func(c *gin.Context) {
+func checkOtp(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		sessionUser := session.Get("user").(*config.User)
 		retData := make(map[string]interface{})
-		var users []config.User
 
-		env.DB.Find(&users)
+		url := c.PostForm("url")
+		code := c.PostForm("code")
 
-		retData["status"] = "ok"
-		retData["users"] = users
+		var secret string
+		if sessionUser.OTPSecret == "" {
+			secret = url
+		} else {
+			secret = sessionUser.OTPSecret
+		}
 
-		c.JSON(http.StatusOK, retData)
+		key, err := otp.NewKeyFromURL(secret)
+		if err != nil {
+			c.AbortWithError(http.StatusInternalServerError, err)
+			return
+		}
+
+		if totp.Validate(code, key.Secret()) {
+			env.Red.Println(sessionUser)
+			if sessionUser.OTPSecret == "" {
+				env.DB.Model(&sessionUser).Update("otp_secret", key.String())
+
+				c.Redirect(http.StatusFound, "/logout")
+				c.Abort()
+				return
+			}
+
+			session.Set("otpauthed", true)
+			session.Save()
+
+			c.Redirect(http.StatusFound, "/sessions")
+			c.Abort()
+			return
+		}
+
+		retData["status"] = "error"
+		retData["message"] = "try again"
+
+		c.JSON(http.StatusUnauthorized, retData)
 	}
 }
 
 func setupotp(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		sessionUser := session.Get("user").(*config.User)
+
+		if sessionUser.OTPSecret != "" {
+			if otpAuthed := session.Get("otpauthed"); otpAuthed == nil || !(otpAuthed.(bool)) {
+				c.Redirect(http.StatusFound, "/otp")
+				c.Abort()
+				return
+			}
+		}
+
+		var key *otp.Key
+		var err error
+		if sessionUser.OTPSecret != "" {
+			key, err = otp.NewKeyFromURL(sessionUser.OTPSecret)
+		} else {
+			key, err = totp.Generate(totp.GenerateOpts{
+				Issuer:      env.Vconfig.GetString("otp.issuer"),
+				AccountName: sessionUser.Email,
+			})
+		}
+
+		if err != nil {
+			env.Red.Println(err)
+		}
+
+		var buf bytes.Buffer
+		img, err := key.Image(200, 200)
+		if err != nil {
+			env.Red.Println(err)
+		}
+
+		png.Encode(&buf, img)
+
 		retData := make(map[string]interface{})
-		var users []config.User
-
-		env.DB.Find(&users)
-
-		retData["status"] = "ok"
-		retData["users"] = users
+		retData["otpurl"] = key.String()
+		retData["imageurl"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
 
 		c.JSON(http.StatusOK, retData)
 	}
