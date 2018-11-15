@@ -66,12 +66,14 @@
             <a class="navbar-brand" href="/">SSH Bastion Admin</a></div>
         <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
-                <li><a href="/sessions">Sessions</a></li>
-                <li><a href="/livesessions">Live Sessions</a></li>
-                <li><a href="/users">Users</a></li>
+                {{ if .Admin }}
+                    <li><a href="/sessions">Sessions</a></li>
+                    <li><a href="/livesessions">Live Sessions</a></li>
+                    <li><a href="/users">Users</a></li>
+                {{ end }}
             </ul>
             <ul class="nav navbar-nav navbar-right">
-                <li><a href="/users"><i class="fa fa-user"></i> {{.Email}}</a></li>
+                <li><a href="/logout"><i class="fa fa-user"></i> {{.Email}} - Logout</a></li>
             </ul>
         </div>
     </div>

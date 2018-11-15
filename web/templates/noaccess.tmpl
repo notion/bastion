@@ -4,7 +4,7 @@
     <h1 class="display-4">Hello, {{.Email}}!</h1>
     <p class="lead">You have no access to this service. Thanks for logging in!</p>
     <hr class="my-4">
-    {{ if not .Cert }}
+    {{ if .Authorized }}
         <p>You have been granted access to something though! Here's the bundle to login.</p>
         <p class="lead">
             <a class="btn btn-primary btn-lg" href="/api/users/{{.ID}}/keys" role="button">Download Bundle</a>

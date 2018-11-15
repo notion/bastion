@@ -122,7 +122,11 @@
             sessions_table = $('#sessions-table').DataTable({
                 buttons: [
                     'copy', 'csv', 'excel', 'pdf', 'print'
-                ]
+                ],
+                'sPaginationType': 'full_numbers',
+                'bServerSide': true,
+                'sAjaxSource': '/api/livesessions',
+                'iDisplayLength': 50
             });
             sessions_table.buttons().container().appendTo('#sessions-table_wrapper .col-sm-6:eq(0)');
         });

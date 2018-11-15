@@ -1,6 +1,5 @@
 package web
 
-import "C"
 import (
 	"archive/zip"
 	"bytes"
@@ -280,7 +279,7 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
-		if env.GCE {
+		if env.GCE || true { // TODO
 			var livesessions []config.LiveSession
 			env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
 				return db.Select([]string{"id", "email"})
@@ -295,23 +294,31 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 				}
 			}
 
-			var newSessions []interface{}
+			newSessions := make(map[string]interface{})
 			for _, v := range livesessions {
-				newSessions = append(newSessions, map[string]interface{}{
-					"Name":     v.Name,
-					"WS":       v.WS,
-					"Host":     v.Host,
-					"Hostname": v.Hostname,
-					"User":     v.User.Email,
-					"Sessions": sessions[v.Name],
-					"Command":  v.Command,
-				})
+				if _, ok := newSessions[v.Name]; !ok {
+					newSessions[v.Name] = map[string]interface{}{
+						"Name":     v.Name,
+						"WS":       v.WS,
+						"Host":     v.Host,
+						"Hostname": v.Hostname,
+						"User":     v.User.Email,
+						"Sessions": sessions[v.Name],
+						"Command":  v.Command,
+					}
+				}
+			}
+
+			actualSessions := make([]interface{}, 0)
+
+			for _, v := range newSessions {
+				actualSessions = append(actualSessions, v)
 			}
 
 			retData := make(map[string]interface{})
 
 			retData["status"] = "ok"
-			retData["livesessions"] = newSessions
+			retData["livesessions"] = actualSessions
 
 			c.JSON(http.StatusOK, retData)
 			return
@@ -784,7 +791,6 @@ func checkOtp(env *config.Env) func(c *gin.Context) {
 		}
 
 		if totp.Validate(code, key.Secret()) {
-			env.Red.Println(sessionUser)
 			if sessionUser.OTPSecret == "" {
 				env.DB.Model(&sessionUser).Update("otp_secret", key.String())
 
