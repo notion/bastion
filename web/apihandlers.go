@@ -280,10 +280,100 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
 		if env.GCE || true { // TODO
+			limit, err := strconv.Atoi(c.Query("length"))
+			if err != nil {
+				limit = 10
+			}
+
+			offset, err := strconv.Atoi(c.Query("start"))
+			if err != nil {
+				offset = 0
+			}
+
+			order := c.Request.URL.Query().Get("order[0][dir]")
+			if order != "asc" {
+				order = "desc"
+			}
+
+			orderCol := c.Request.URL.Query().Get("order[0][column]")
+
+			switch orderCol {
+			case "0":
+				orderCol = "id"
+			case "1":
+				orderCol = "host"
+			case "2":
+				orderCol = "user_id"
+			case "3":
+				orderCol = "name"
+			case "4":
+				orderCol = "command"
+			}
+
+			search := c.Request.URL.Query().Get("search[value]")
+
 			var livesessions []config.LiveSession
-			env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
+			// FIXME
+			ref := env.DB.Unscoped().Preload("User", func(db *gorm.DB) *gorm.DB {
 				return db.Select([]string{"id", "email"})
-			}).Select([]string{"user_id", "time", "name", "host", "hostname", "ws", "command"}).Find(&livesessions)
+			}).Select([]string{
+				"id",
+				"user_id",
+				"time",
+				"name",
+				"host",
+				"hostname",
+				"ws",
+				"command",
+			}).Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").QueryExpr())
+
+			type res struct {
+				Name  string
+				Count int
+			}
+
+			var results []res
+			env.DB.Table("live_sessions").Select([]string{"name", "count(name) as count"}).Group("name").Having("count(name) > ?", 1).Scan(&results)
+
+			resultsMap := make(map[string]res)
+			for _, v := range results {
+				resultsMap[v.Name] = v
+			}
+
+			userIds := make([]uint, 0)
+
+			addWhere := func(db *gorm.DB) *gorm.DB {
+				if search == "" {
+					return db
+				}
+
+				ref := db.Where(
+					"name like ? OR host like ? OR hostname like ? OR user_id in (?)",
+					search,
+					search,
+					search,
+					userIds,
+				)
+
+				return ref
+			}
+
+			if search != "" {
+				search = "%" + search + "%"
+
+				newIds := make([]uint, 0)
+				var users []config.User
+				env.DB.Table("users").Select("id").Where("email like ?", search).Find(&users)
+
+				for _, u := range users {
+					newIds = append(newIds, u.ID)
+				}
+
+				userIds = newIds
+				ref = addWhere(ref)
+			}
+
+			ref.Order(fmt.Sprintf("%s %s", orderCol, order)).Limit(limit).Offset(offset).Find(&livesessions)
 
 			sessions := make(map[string]int)
 			for _, v := range livesessions {
@@ -294,31 +384,49 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 				}
 			}
 
-			newSessions := make(map[string]interface{})
+			newSessions := make(map[string]config.LiveSession)
+			arrayData := make([]interface{}, 0)
 			for _, v := range livesessions {
 				if _, ok := newSessions[v.Name]; !ok {
-					newSessions[v.Name] = map[string]interface{}{
-						"Name":     v.Name,
-						"WS":       v.WS,
-						"Host":     v.Host,
-						"Hostname": v.Hostname,
-						"User":     v.User.Email,
-						"Sessions": sessions[v.Name],
-						"Command":  v.Command,
+					newSessions[v.Name] = v
+
+					innerData := make([]interface{}, 7)
+
+					innerData[0] = v.ID
+					innerData[1] = fmt.Sprintf("%s - %s", v.Host, v.Hostname)
+					innerData[2] = v.User.Email
+					innerData[3] = v.Name
+					innerData[4] = v.Command
+
+					if v2, ok := resultsMap[v.Name]; ok {
+						innerData[5] = v.WS + ";" + strconv.Itoa(v2.Count)
+						innerData[6] = v.WS + ";" + strconv.Itoa(v2.Count)
+					} else {
+						innerData[5] = v.WS + ";1"
+						innerData[6] = v.WS + ";1"
 					}
+
+					arrayData = append(arrayData, innerData)
 				}
 			}
 
-			actualSessions := make([]interface{}, 0)
-
-			for _, v := range newSessions {
-				actualSessions = append(actualSessions, v)
+			draw, err := strconv.Atoi(c.Query("draw"))
+			if err != nil {
+				draw = 1
 			}
 
-			retData := make(map[string]interface{})
+			var filteredSessions int
+			var allSessions int
 
-			retData["status"] = "ok"
-			retData["livesessions"] = actualSessions
+			// Where(map[string]interface{}{"deleted_at": nil})
+			env.DB.Table("live_sessions").Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").QueryExpr()).Count(&allSessions)
+			addWhere(env.DB.Table("live_sessions").Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").QueryExpr())).Count(&filteredSessions)
+
+			retData["draw"] = draw
+			retData["recordsTotal"] = allSessions
+			retData["recordsFiltered"] = filteredSessions
+
+			retData["data"] = arrayData
 
 			c.JSON(http.StatusOK, retData)
 			return
