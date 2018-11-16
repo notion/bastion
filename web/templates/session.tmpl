@@ -161,32 +161,31 @@
     }
 
     $(function() {
-        $.getJSON('/api/sessions', function(data) {
-            if (data.sessions) {
-                for (var elem in data.sessions) {
-                    var place = parseInt(elem) + 1;
-                    var session = data.sessions[elem];
-                    $("#sessions-table > tbody").append(`
-                        <tr>
-                            <th>${place}</th>
-                            <th>${session.Host} - ${session.Hostname}</th>
-                            <th>${session.User.Email}</th>
-                            <th>${session.Users}</th>
-                            <th>${session.Name}</th>
-                            <td><button onclick="playCast('${session.Name}')" class="btn btn-primary">Play</button></td>
-                            <td><button onclick="playCastTerm('${session.Name}')" class="btn btn-primary">Play With Users</button></td>
-                            <th>${session.Command}</th>
-                        </tr>
-                    `);
+        sessions_table = $('#sessions-table').DataTable({
+            buttons: [
+                'copy', 'csv', 'excel', 'pdf', 'print'
+            ],
+            serverSide: true,
+            ajax: '/api/sessions',
+            order: [[0, 'desc']],
+            columnDefs: [{
+                targets: 5,
+                render: function (data, type, row, meta) {
+                    return `<td><button onclick="playCast('${data}')" class="btn btn-primary">Play</button></td>`;
                 }
-            }
-            sessions_table = $('#sessions-table').DataTable({
-                buttons: [
-                    'copy', 'csv', 'excel', 'pdf', 'print'
-                ]
-            });
-            sessions_table.buttons().container().appendTo('#sessions-table_wrapper .col-sm-6:eq(0)');
+            }, {
+                targets: 6,
+                render: function (data, type, row, meta) {
+                    return `<td><button onclick="playCastTerm('${data}')" class="btn btn-primary">Play With Users</button></td>;`;
+                }
+            }, {
+                targets: 7,
+                render: function (data, type, row, meta) {
+                    return `<pre>${escapeHtml(data)}</pre>`;
+                }
+            }]
         });
+        sessions_table.buttons().container().appendTo('#sessions-table_wrapper .col-sm-6:eq(0)');
     })
 </script>
 {{ template "footer" .}}

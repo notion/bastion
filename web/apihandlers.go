@@ -240,15 +240,122 @@ func logout(env *config.Env) func(c *gin.Context) {
 
 func session(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
+		limit, err := strconv.Atoi(c.Query("length"))
+		if err != nil {
+			limit = 10
+		}
+
+		offset, err := strconv.Atoi(c.Query("start"))
+		if err != nil {
+			offset = 0
+		}
+
+		order := c.Request.URL.Query().Get("order[0][dir]")
+		if order != "asc" {
+			order = "desc"
+		}
+
+		orderCol := c.Request.URL.Query().Get("order[0][column]")
+
+		switch orderCol {
+		case "0":
+			orderCol = "id"
+		case "1":
+			orderCol = "host"
+		case "2":
+			orderCol = "user_id"
+		case "3":
+			orderCol = "name"
+		case "4":
+			orderCol = "command"
+		}
+
+		search := c.Request.URL.Query().Get("search[value]")
+
 		var sessions []config.Session
-		env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
+		ref := env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
 			return db.Select([]string{"id", "email"})
-		}).Select([]string{"user_id", "time", "name", "host", "hostname", "users", "command"}).Find(&sessions)
+		}).Select([]string{
+			"id",
+			"user_id",
+			"time",
+			"name",
+			"host",
+			"hostname",
+			"users",
+			"command",
+		})
+
+		userIds := make([]uint, 0)
+
+		addWhere := func(db *gorm.DB) *gorm.DB {
+			if search == "" {
+				return db
+			}
+
+			ref := db.Where(
+				"name like ? OR host like ? OR hostname like ? OR users like ? OR command like ? OR user_id in (?)",
+				search,
+				search,
+				search,
+				search,
+				search,
+				userIds,
+			)
+
+			return ref
+		}
+
+		if search != "" {
+			search = "%" + search + "%"
+
+			newIds := make([]uint, 0)
+			var users []config.User
+			env.DB.Table("users").Select("id").Where("email like ?", search).Find(&users)
+
+			for _, u := range users {
+				newIds = append(newIds, u.ID)
+			}
+
+			userIds = newIds
+			ref = addWhere(ref)
+		}
+
+		ref.Order(fmt.Sprintf("%s %s", orderCol, order)).Limit(limit).Offset(offset).Find(&sessions)
+
+		arrayData := make([]interface{}, 0)
+		for _, v := range sessions {
+			innerData := make([]interface{}, 8)
+
+			innerData[0] = v.ID
+			innerData[1] = fmt.Sprintf("%s - %s", v.Host, v.Hostname)
+			innerData[2] = v.User.Email
+			innerData[3] = v.Users
+			innerData[4] = v.Name
+			innerData[5] = v.Name
+			innerData[6] = v.Name
+			innerData[7] = v.Command
+
+			arrayData = append(arrayData, innerData)
+		}
+
+		draw, err := strconv.Atoi(c.Query("draw"))
+		if err != nil {
+			draw = 1
+		}
+
+		var filteredSessions int
+		var allSessions int
+
+		env.DB.Table("sessions").Where(map[string]interface{}{"deleted_at": nil}).Count(&allSessions)
+		addWhere(env.DB.Table("sessions").Where(map[string]interface{}{"deleted_at": nil})).Count(&filteredSessions)
 
 		retData := make(map[string]interface{})
 
-		retData["status"] = "ok"
-		retData["sessions"] = sessions
+		retData["draw"] = draw
+		retData["recordsTotal"] = allSessions
+		retData["recordsFiltered"] = filteredSessions
+		retData["data"] = arrayData
 
 		c.JSON(http.StatusOK, retData)
 	}
@@ -279,7 +386,7 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 
-		if env.GCE || true { // TODO
+		if env.GCE {
 			limit, err := strconv.Atoi(c.Query("length"))
 			if err != nil {
 				limit = 10
@@ -313,8 +420,8 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 			search := c.Request.URL.Query().Get("search[value]")
 
 			var livesessions []config.LiveSession
-			// FIXME
-			ref := env.DB.Unscoped().Preload("User", func(db *gorm.DB) *gorm.DB {
+
+			ref := env.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
 				return db.Select([]string{"id", "email"})
 			}).Select([]string{
 				"id",
@@ -348,7 +455,8 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 				}
 
 				ref := db.Where(
-					"name like ? OR host like ? OR hostname like ? OR user_id in (?)",
+					"name like ? OR host like ? OR hostname like ? OR command like ? OR user_id in (?)",
+					search,
 					search,
 					search,
 					search,
@@ -375,15 +483,6 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 
 			ref.Order(fmt.Sprintf("%s %s", orderCol, order)).Limit(limit).Offset(offset).Find(&livesessions)
 
-			sessions := make(map[string]int)
-			for _, v := range livesessions {
-				if _, ok := sessions[v.Name]; ok {
-					sessions[v.Name]++
-				} else {
-					sessions[v.Name] = 1
-				}
-			}
-
 			newSessions := make(map[string]config.LiveSession)
 			arrayData := make([]interface{}, 0)
 			for _, v := range livesessions {
@@ -396,14 +495,14 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 					innerData[1] = fmt.Sprintf("%s - %s", v.Host, v.Hostname)
 					innerData[2] = v.User.Email
 					innerData[3] = v.Name
-					innerData[4] = v.Command
+					innerData[6] = v.Command
 
 					if v2, ok := resultsMap[v.Name]; ok {
+						innerData[4] = v.WS + ";" + strconv.Itoa(v2.Count)
 						innerData[5] = v.WS + ";" + strconv.Itoa(v2.Count)
-						innerData[6] = v.WS + ";" + strconv.Itoa(v2.Count)
 					} else {
+						innerData[4] = v.WS + ";1"
 						innerData[5] = v.WS + ";1"
-						innerData[6] = v.WS + ";1"
 					}
 
 					arrayData = append(arrayData, innerData)
@@ -418,9 +517,8 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 			var filteredSessions int
 			var allSessions int
 
-			// Where(map[string]interface{}{"deleted_at": nil})
-			env.DB.Table("live_sessions").Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").QueryExpr()).Count(&allSessions)
-			addWhere(env.DB.Table("live_sessions").Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").QueryExpr())).Count(&filteredSessions)
+			env.DB.Table("live_sessions").Where(map[string]interface{}{"deleted_at": nil}).Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").QueryExpr()).Count(&allSessions)
+			addWhere(env.DB.Table("live_sessions").Where(map[string]interface{}{"deleted_at": nil}).Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").QueryExpr())).Count(&filteredSessions)
 
 			retData["draw"] = draw
 			retData["recordsTotal"] = allSessions
@@ -432,20 +530,23 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 			return
 		}
 
-		var newSessions []interface{}
+		i := 1
+		newSessions := make([]interface{}, 0)
 		env.SSHProxyClients.Range(func(key interface{}, value interface{}) bool {
 			client := value.(*config.SSHProxyClient)
 			serverClient := client.SSHServerClient
 
 			client.Mutex.Lock()
 			if client.SSHServerClient.User != nil && len(client.SSHShellSessions) > 0 {
-				sessionData := make(map[string]interface{})
-				sessionData["Name"] = serverClient.Client.RemoteAddr().String()
-				sessionData["WS"] = key.(string)
-				sessionData["Host"] = client.SSHServerClient.ProxyTo
-				sessionData["Hostname"] = client.SSHServerClient.ProxyToHostname
-				sessionData["User"] = client.SSHServerClient.User.Email
-				sessionData["Sessions"] = len(client.SSHShellSessions)
+				innerData := make([]interface{}, 7)
+
+				innerData[0] = i
+				innerData[1] = fmt.Sprintf("%s - %s", client.SSHServerClient.ProxyTo, client.SSHServerClient.ProxyToHostname)
+				innerData[2] = client.SSHServerClient.User.Email
+				innerData[3] = serverClient.Client.RemoteAddr().String()
+				innerData[5] = key.(string) + ";" + strconv.Itoa(len(client.SSHShellSessions))
+				innerData[6] = key.(string) + ";" + strconv.Itoa(len(client.SSHShellSessions))
+
 				wholeCommand := ""
 
 				for _, v := range client.SSHShellSessions {
@@ -463,16 +564,16 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 						}
 					}
 				}
-				sessionData["Command"] = wholeCommand
-				newSessions = append(newSessions, sessionData)
+				innerData[4] = wholeCommand
+				newSessions = append(newSessions, innerData)
+				i++
 			}
 			client.Mutex.Unlock()
 
 			return true
 		})
 
-		retData["status"] = "ok"
-		retData["livesessions"] = newSessions
+		retData["data"] = newSessions
 
 		c.JSON(http.StatusOK, retData)
 	}

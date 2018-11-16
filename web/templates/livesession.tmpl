@@ -22,9 +22,9 @@
                 <th>Host</th>
                 <th>Email</th>
                 <th>Name</th>
-                <th>Command</th>
                 <th>Disconnect</th>
                 <th>Join</th>
+                <th>Command</th>
             </tr>
             </thead>
             <tbody>
@@ -91,43 +91,23 @@
         $('#playModal').on('hidden.bs.modal', function () {
             window.OpenSocket.close();
             term.clear();
-        })
+        });
 
         $.getJSON('/api/livesessions', function(data) {
-            if (data.livesessions) {
-                for (var elem in data.livesessions) {
-                    var place = parseInt(elem) + 1;
-                    var session = data.livesessions[elem];
-                    var buttons = '';
-                    var disconnectButtons = '';
-
-                    for(var i = 0; i < parseInt(session.Sessions); i++) {
-                        buttons += `<button onclick="playCast('${session.WS}', ${i})" class="btn btn-sm btn-primary">Join ${i}</button>    `;
-                        disconnectButtons += `<button onclick="disconnectSession('${session.WS}', ${i})" class="btn btn-sm btn-danger">Disconnect ${i}</button>`
-                    }
-
-                    $("#sessions-table > tbody").append(`
-                        <tr>
-                            <th>${place}</th>
-                            <th>${session.Host} - ${session.Hostname}</th>
-                            <th>${session.User}</th>
-                            <th>${session.Name}</th>
-                            <th>${session.Command}</th>
-                            <td>${disconnectButtons}</td>
-                            <td>${buttons}</td>
-                        </tr>
-                    `);
-                }
+            let server = false;
+            if ('draw' in data) {
+                server = true;
             }
+
             sessions_table = $('#sessions-table').DataTable({
                 buttons: [
                     'copy', 'csv', 'excel', 'pdf', 'print'
                 ],
-                serverSide: true,
+                serverSide: server,
                 ajax: '/api/livesessions',
-                order: [[0, 'desc']],
+                order: [[0, (server ? 'desc' : 'asc')]],
                 columnDefs: [{
-                    targets: 5,
+                    targets: 4,
                     render: function (data, type, row, meta) {
                         var buttons = '';
                         var split = data.split(';')
@@ -139,7 +119,7 @@
                         return buttons;
                     }
                 }, {
-                    targets: 6,
+                    targets: 5,
                     render: function (data, type, row, meta) {
                         var buttons = '';
                         var split = data.split(';')
@@ -149,6 +129,11 @@
                         }
 
                         return buttons;
+                    }
+                }, {
+                    targets: 6,
+                    render: function (data, type, row, meta) {
+                        return `<pre>${escapeHtml(data)}</pre>`;
                     }
                 }]
             });
