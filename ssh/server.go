@@ -18,43 +18,8 @@ import (
 
 func startServer(addr string, proxyAddr string, env *config.Env) {
 	signer := ParsePrivateKey(env.Config.PrivateKey, env.PKPassphrase, env)
-	userSigner := ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
 
-	sshConfig := &ssh.ServerConfig{
-		NoClientAuth: false,
-		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
-
-			certcheck := &ssh.CertChecker{
-				IsUserAuthority: func(auth ssh.PublicKey) bool {
-					return bytes.Equal(auth.Marshal(), userSigner.PublicKey().Marshal())
-				},
-			}
-
-			perms, err := certcheck.Authenticate(c, key)
-			if err != nil {
-				env.Red.Println("Unable to verify certificate:", err)
-				return nil, errors.New("Unable to authenticate Key/Token")
-			}
-
-			keyData := ssh.MarshalAuthorizedKey(key)
-			var sessionUser config.User
-
-			if env.DB.First(&sessionUser, "cert = ?", keyData).RecordNotFound() {
-				return nil, errors.New("user cannot be found")
-			}
-
-			if !sessionUser.Authorized {
-				return nil, errors.New("user is not authorized")
-			}
-
-			env.SSHServerClients.Store(c.RemoteAddr().String(), &config.SSHServerClient{
-				User: &sessionUser,
-			})
-
-			return perms, nil
-		},
-	}
+	sshConfig := getSSHServerConfig(env, signer)
 
 	sshConfig.AddHostKey(signer)
 
@@ -202,4 +167,44 @@ func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr
 			}
 		}
 	}()
+}
+
+func getSSHServerConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
+	userSigner := ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
+
+	return &ssh.ServerConfig{
+		NoClientAuth: false,
+		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
+
+			certcheck := &ssh.CertChecker{
+				IsUserAuthority: func(auth ssh.PublicKey) bool {
+					return bytes.Equal(auth.Marshal(), userSigner.PublicKey().Marshal())
+				},
+			}
+
+			perms, err := certcheck.Authenticate(c, key)
+			if err != nil {
+				env.Red.Println("Unable to verify certificate:", err)
+				return nil, errors.New("Unable to authenticate Key/Token")
+			}
+
+			keyData := ssh.MarshalAuthorizedKey(key)
+			var sessionUser config.User
+
+			if env.DB.First(&sessionUser, "cert = ?", keyData).RecordNotFound() {
+				return nil, errors.New("user cannot be found")
+			}
+
+			if !sessionUser.Authorized {
+				return nil, errors.New("user is not authorized")
+			}
+
+			env.SSHServerClients.Store(c.RemoteAddr().String(), &config.SSHServerClient{
+				User: &sessionUser,
+			})
+
+			return perms, nil
+		},
+	}
 }

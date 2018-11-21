@@ -17,87 +17,7 @@ import (
 
 func startProxyServer(addr string, env *config.Env) {
 	signer := ParsePrivateKey(env.Config.PrivateKey, env.PKPassphrase, env)
-	serverSigner := ParsePrivateKey(env.Config.ServerPrivateKey, env.PKPassphrase, env)
-
-	sshConfig := &ssh.ServerConfig{
-		NoClientAuth: false,
-		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
-
-			if proxClient, ok := env.SSHProxyClients.Load(c.RemoteAddr().String()); ok {
-				proxyClient := proxClient.(*config.SSHProxyClient)
-				duration, err := time.ParseDuration("1m")
-				if err != nil {
-					env.Red.Println("Unable to parse duration to expire:", err)
-				}
-
-				casigner := NewCASigner(serverSigner, duration, []string{}, []string{})
-
-				cert, PK, err := casigner.Sign(env, "root", nil)
-				if err != nil {
-					env.Red.Println("Unable to sign PK:", err)
-				}
-
-				signer = ParsePrivateKey(PK, env.PKPassphrase, env)
-
-				certsigner, err := ssh.NewCertSigner(cert, signer)
-				if err != nil {
-					env.Red.Println("Error loading cert signer:", err)
-				}
-
-				clientConfig := &ssh.ClientConfig{
-					HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-						return nil
-					},
-					User: "root",
-					Auth: []ssh.AuthMethod{
-						ssh.PublicKeys(certsigner),
-					},
-				}
-
-				client, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
-				if err != nil {
-					env.Red.Println("Error in proxy authentication:", err)
-					return nil, err
-				}
-
-				session, _ := client.NewSession()
-				defer session.Close()
-				defer client.Close()
-
-				var stdoutBuf bytes.Buffer
-				session.Stdout = &stdoutBuf
-				session.Run("hostname")
-
-				if proxyClient.SSHServerClient.User.AuthorizedHosts != "" {
-					regexMatch, err := regexp.MatchString(proxyClient.SSHServerClient.User.AuthorizedHosts, strings.TrimSpace(stdoutBuf.String()))
-					if err != nil {
-						env.Red.Println("Unable to match regex for host:", err)
-					}
-
-					proxyClient.SSHServerClient.ProxyToHostname = strings.TrimSpace(stdoutBuf.String())
-
-					if !regexMatch {
-						return nil, errors.New("can't find initial proxy connection")
-					}
-				} else {
-					return nil, errors.New("can't find initial proxy connection")
-				}
-
-				realClient, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
-				if err != nil {
-					env.Red.Println("Error in proxy authentication:", err)
-					return nil, err
-				}
-
-				proxyClient.SSHClient = realClient
-
-				return nil, err
-			}
-
-			return nil, errors.New("can't find initial proxy connection")
-		},
-	}
+	sshConfig := getSSHProxyConfig(env, signer)
 
 	sshConfig.AddHostKey(signer)
 
@@ -155,5 +75,85 @@ func startProxyServer(addr string, env *config.Env) {
 		}()
 
 		env.Yellow.Printf("New connection from %s", tcpConn.RemoteAddr())
+	}
+}
+
+func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
+	serverSigner := ParsePrivateKey(env.Config.ServerPrivateKey, env.PKPassphrase, env)
+
+	return &ssh.ServerConfig{
+		NoClientAuth: false,
+		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
+
+			if proxClient, ok := env.SSHProxyClients.Load(c.RemoteAddr().String()); ok {
+				proxyClient := proxClient.(*config.SSHProxyClient)
+				duration := time.Minute * 1
+				casigner := NewCASigner(serverSigner, duration, []string{}, []string{})
+
+				cert, PK, err := casigner.Sign(env, "root", nil)
+				if err != nil {
+					env.Red.Println("Unable to sign PK:", err)
+				}
+
+				signer = ParsePrivateKey(PK, env.PKPassphrase, env)
+
+				certsigner, err := ssh.NewCertSigner(cert, signer)
+				if err != nil {
+					env.Red.Println("Error loading cert signer:", err)
+				}
+
+				clientConfig := &ssh.ClientConfig{
+					HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+						return nil
+					},
+					User: "root",
+					Auth: []ssh.AuthMethod{
+						ssh.PublicKeys(certsigner),
+					},
+				}
+
+				client, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
+				if err != nil {
+					env.Red.Println("Error in proxy authentication:", err)
+					return nil, err
+				}
+
+				session, _ := client.NewSession()
+				defer session.Close()
+				defer client.Close()
+
+				var stdoutBuf bytes.Buffer
+				session.Stdout = &stdoutBuf
+				session.Run("hostname")
+
+				if proxyClient.SSHServerClient.User.AuthorizedHosts != "" {
+					regexMatch, err := regexp.MatchString(proxyClient.SSHServerClient.User.AuthorizedHosts, strings.TrimSpace(stdoutBuf.String()))
+					if err != nil {
+						env.Red.Println("Unable to match regex for host:", err)
+					}
+
+					proxyClient.SSHServerClient.ProxyToHostname = strings.TrimSpace(stdoutBuf.String())
+
+					if !regexMatch {
+						return nil, errors.New("no authorization for host")
+					}
+				} else {
+					return nil, errors.New("user has no authorization for hosts")
+				}
+
+				realClient, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
+				if err != nil {
+					env.Red.Println("Error in proxy authentication:", err)
+					return nil, err
+				}
+
+				proxyClient.SSHClient = realClient
+
+				return nil, err
+			}
+
+			return nil, errors.New("can't find initial proxy connection")
+		},
 	}
 }

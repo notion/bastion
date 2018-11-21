@@ -9,18 +9,20 @@
     });
 </script>
 <div class="row">
-    <form id="updateForm" action="/api/otp" method="POST">
-        <img id="qrcode">
-        <div class="form-group">
-            <label for="code">OTP Code:</label>
-            <input type="text" class="form-control" id="code" placeholder="Code" name="code" autocomplete="off">
-        </div>
-        <div class="form-group">
-            <label for="url">OTP Url:</label>
-            <input type="text" class="form-control" id="url" placeholder="URL" name="url" readonly>
-        </div>
-        <button type="submit" class="btn btn-default">Submit</button>
-    </form>
+    <div class="col-sm-12">
+        <form id="updateForm" action="/api/otp" method="POST">
+            <img id="qrcode">
+            <div class="form-group">
+                <label for="code">OTP Code:</label>
+                <input type="text" class="form-control" id="code" placeholder="Code" name="code" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="url">OTP Url:</label>
+                <input type="text" class="form-control" id="url" placeholder="URL" name="url" readonly>
+            </div>
+            <button type="submit" class="btn btn-default">Submit</button>
+        </form>
+    </div>
 </div>
 {{ template "footer" .}}
 {{ end }}

@@ -1,11 +1,8 @@
 {{ define "livesession" }}
 {{ template "header" .}}
 <style>
-    @media (min-width: 768px) {
-        .modal-xl {
-            width: 90%;
-            min-height: 400px;
-        }
+    .modal-xl {
+        max-width: 90%;
     }
 
     #terminal-container {
@@ -14,8 +11,8 @@
     }
 </style>
 <div class="row">
-    <div id="sessions"><h2>Live Sessions:</h2>
-        <table class="table table-responsive table-striped table-bordered dt-responsive nowrap" id="sessions-table" cellspacing="0" width="100%">
+    <div id="sessions" style="width: 100%"><h4>Live Sessions:</h4>
+        <table class="table table-striped table-bordered dt-responsive nowrap" id="sessions-table" cellspacing="0" width="100%">
             <thead id="table-head-1">
             <tr id="table-head-row-1">
                 <th>#</th>
@@ -67,8 +64,8 @@
         websocket.onopen = function(evt) {
             term = new Terminal({
                 cursorBlink: true,
-                cols: 250,
-                rows: 50
+                cols: 170,
+                rows: 35
             });
             term.open(document.getElementById("terminal-container"), true);
             term.toggleFullscreen(true);
