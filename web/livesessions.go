@@ -392,10 +392,12 @@ func liveSessionWSGCE(env *config.Env) func(c *gin.Context) {
 			WSProxy := websocketproxy.NewProxy(newURL)
 			WSProxy.ServeHTTP(c.Writer, c.Request)
 			return
-		}
-
-		if authcode != dblivesession.AuthCode {
+		} else if authcode != dblivesession.AuthCode {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, map[string]interface{}{"status": false, "error": "Invalid auth code."})
+			return
+		} else {
+			liveSessionWS(env)(c)
+			return
 		}
 	}
 }
