@@ -1,15 +1,13 @@
 {{ define "session" }}
 {{ template "header" .}}
 <style>
-    @media (min-width: 768px) {
-        .modal-xl {
-            width: 90%;
-        }
+    .modal-xl {
+        max-width: 90%;
     }
 </style>
 <div class="row">
-    <div id="sessions"><h2>Sessions:</h2>
-        <table class="table table-responsive table-striped table-bordered dt-responsive nowrap" id="sessions-table" cellspacing="0" width="100%">
+    <div id="sessions" style="width: 100%"><h4>Sessions:</h4>
+        <table class="table table-striped table-bordered dt-responsive nowrap" id="sessions-table" cellspacing="0" width="100%">
             <thead id="table-head-1">
             <tr id="table-head-row-1">
                 <th>#</th>
@@ -100,7 +98,7 @@
 
     function playCast(id) {
         $('#playerSessionModal').html(`
-            <asciinema-player id="sessionPlayer" poster="npt:0:0.1" font-size="small" preload="true" cols="1000" rows="60" src="/api/sessions/${id}" idle-time-limit="1"></asciinema-player>
+            <asciinema-player id="sessionPlayer" poster="npt:0:0.1" font-size="small" preload="true" cols="1000" rows="40" src="/api/sessions/${id}" idle-time-limit="1"></asciinema-player>
         `);
 
         $('#playModal').modal({
@@ -118,12 +116,13 @@
             var usedColors = [];
             term = new Terminal({
                 cursorBlink: true,
-                cols: 250,
-                rows: 50
+                cols: 170,
+                rows: 35
             });
             term.open(document.getElementById("terminal-container"), true);
             term.toggleFullscreen(true);
 
+            var lastTime = 0;
             data.split("\n").forEach(function(data) {
                 try {
                     var foo = JSON.parse(data);
@@ -145,9 +144,15 @@
                         var open = users[foo[3]].open,
                             close = users[foo[3]].close;
 
+                        var time = foo[0] * 1000;
+                        if (time - lastTime > 3000) {
+                            time = lastTime + 3000;
+                        }
+                        lastTime = time;
+
                         setTimeout(function() {
                             term.write(open + foo[2] + close);
-                        }, foo[0] * 1000);
+                        }, time);
                     }
                 } catch(e) {
                     return;
@@ -176,7 +181,7 @@
             }, {
                 targets: 6,
                 render: function (data, type, row, meta) {
-                    return `<td><button onclick="playCastTerm('${data}')" class="btn btn-primary">Play With Users</button></td>;`;
+                    return `<td><button onclick="playCastTerm('${data}')" class="btn btn-primary">Play With Users</button></td>`;
                 }
             }, {
                 targets: 7,
