@@ -274,15 +274,15 @@ func disconnectLiveSessionGCE(env *config.Env) func(c *gin.Context) {
 
 func liveSessionWS(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		if env.GCE {
+		authcode, pathKey, sidKey := getLiveSessionParams(c)
+
+		if env.GCE && authcode == "" {
 			liveSessionWSGCE(env)(c)
 			return
 		}
 
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
-
-		_, pathKey, sidKey := getLiveSessionParams(c)
 
 		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 
