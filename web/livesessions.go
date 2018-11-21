@@ -205,14 +205,14 @@ func liveSessionGCE(env *config.Env) func(c *gin.Context) {
 
 func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		if env.GCE {
+		authcode, pathKey, sidKey := getLiveSessionParams(c)
+
+		if env.GCE && authcode == "" {
 			disconnectLiveSessionGCE(env)(c)
 			return
 		}
 
 		retData := make(map[string]interface{})
-
-		_, pathKey, sidKey := getLiveSessionParams(c)
 
 		if proxyClientInterface, ok := env.SSHProxyClients.Load(pathKey); ok {
 			proxyClient := proxyClientInterface.(*config.SSHProxyClient)
@@ -264,10 +264,12 @@ func disconnectLiveSessionGCE(env *config.Env) func(c *gin.Context) {
 			}
 			rProxy.ServeHTTP(c.Writer, c.Request)
 			return
-		}
-
-		if authcode != dblivesession.AuthCode {
+		} else if authcode != dblivesession.AuthCode {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, map[string]interface{}{"status": false, "error": "Invalid auth code."})
+			return
+		} else {
+			disconnectLiveSession(env)(c)
+			return
 		}
 	}
 }
