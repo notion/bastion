@@ -120,7 +120,11 @@ func (p *ProxyHandler) Serve() {
 									command = string(r.ReqData)
 								}
 
-								wholeCommand += command + ", "
+								if wholeCommand != "" {
+									wholeCommand += ", " + command
+								} else {
+									wholeCommand += command
+								}
 								break
 							}
 						}

@@ -38,8 +38,8 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 				innerData[1] = fmt.Sprintf("%s - %s", client.SSHServerClient.ProxyTo, client.SSHServerClient.ProxyToHostname)
 				innerData[2] = client.SSHServerClient.User.Email
 				innerData[3] = serverClient.Client.RemoteAddr().String()
+				innerData[4] = key.(string) + ";" + strconv.Itoa(len(client.SSHShellSessions))
 				innerData[5] = key.(string) + ";" + strconv.Itoa(len(client.SSHShellSessions))
-				innerData[6] = key.(string) + ";" + strconv.Itoa(len(client.SSHShellSessions))
 
 				wholeCommand := ""
 
@@ -53,12 +53,16 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 								command = string(r.ReqData)
 							}
 
-							wholeCommand += command + ", "
+							if wholeCommand != "" {
+								wholeCommand += ", " + command
+							} else {
+								wholeCommand += command
+							}
 							break
 						}
 					}
 				}
-				innerData[4] = wholeCommand
+				innerData[6] = wholeCommand
 				newSessions = append(newSessions, innerData)
 				i++
 			}

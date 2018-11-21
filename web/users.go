@@ -104,7 +104,12 @@ func downloadKey(env *config.Env) func(c *gin.Context) {
 				casigner = ssh.NewCASigner(signer, duration, []string{}, []string{})
 			}
 
-			if user.Cert != nil && user.CertExpires.Before(time.Now()) {
+			gracePeriod, err := time.ParseDuration(env.Vconfig.GetString("sshcert.graceperiod"))
+			if err != nil {
+				env.Red.Println("Unable to parse duration to expire:", err)
+			}
+
+			if user.Cert != nil && user.CertExpires.Before(time.Now().Add(gracePeriod)) {
 				cert, PK, err := casigner.Sign(env, user.Email, nil)
 				if err != nil {
 					env.Red.Println("Unable to sign PrivateKey:", err)

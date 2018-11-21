@@ -28,3 +28,5 @@ otp:
   enabled: false
   issuer: example.com
 pkpassphrase: ""
+sshcert:
+  graceperiod: 4h
