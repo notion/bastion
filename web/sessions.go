@@ -146,7 +146,7 @@ func sessionID(env *config.Env) func(c *gin.Context) {
 		} else {
 			c.Header("Content-Encoding", "gzip")
 
-			if !env.GCE {
+			if !env.Vconfig.GetBool("gce.lb.enabled") {
 				c.Header("Transfer-Encoding", "gzip")
 			}
 

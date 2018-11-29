@@ -40,7 +40,7 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 		}
 
 		var proxConn net.Conn
-		if env.GCE {
+		if env.Vconfig.GetBool("gce.lb.proxyproto.enabled") {
 			proxConn = proxyprotocol.ParseConn(tcpConn)
 		} else {
 			proxConn = tcpConn

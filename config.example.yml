@@ -8,13 +8,22 @@ dbinfo:
   user: example
 debug: true
 gce:
-  bucket: example-logs
-  enabled: true
+  bucket:
+    enabled: true
+    name: example-logs
   iap:
     aud: /projects/0000000000000/global/backendServices/000000000000000000
+    enabled: false
     hd:
     - example.com
     issuer: https://cloud.google.com/iap
+  lb:
+    enabled: false
+    proxyproto:
+      enabled: false
+multihost:
+  enabled: false
+  ip: ""
 oauthcredentials:
   clientid: 0000000000000-foobar.apps.googleusercontent.com
   clientsecret: foobar
@@ -28,5 +37,8 @@ otp:
   enabled: false
   issuer: example.com
 pkpassphrase: ""
+sessions:
+  directory: sessions
+  enabled: true
 sshcert:
   graceperiod: 4h

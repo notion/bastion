@@ -24,8 +24,8 @@ var (
 
 func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		if env.GCE {
-			indexGCE(env, conf)(c)
+		if env.Vconfig.GetBool("gce.iap.enabled") {
+			indexIAP(env, conf)(c)
 			return
 		}
 
@@ -108,7 +108,7 @@ func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 	}
 }
 
-func indexGCE(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
+func indexIAP(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 

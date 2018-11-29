@@ -218,7 +218,15 @@ func RandStringBytesMaskImprSrc(n int) string {
 
 // GetOutboundIP get's the outbound internal ip
 // https://stackoverflow.com/questions/23558425/how-do-i-get-the-local-ip-address-in-go
-func GetOutboundIP() net.IP {
+func GetOutboundIP(env *config.Env) net.IP {
+	ip := env.Vconfig.GetString("multihost.ip")
+	if ip != "" {
+		realIP := net.ParseIP(ip)
+		if realIP != nil {
+			return realIP
+		}
+	}
+
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)

@@ -17,8 +17,8 @@ import (
 
 func liveSession(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		if env.GCE {
-			liveSessionGCE(env)(c)
+		if env.Vconfig.GetBool("multihost.enabled") {
+			liveSessionMultiHost(env)(c)
 			return
 		}
 
@@ -77,7 +77,7 @@ func liveSession(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func liveSessionGCE(env *config.Env) func(c *gin.Context) {
+func liveSessionMultiHost(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 		limit, offset, order, orderCol, search := getDataTablesParams(c)
@@ -211,8 +211,8 @@ func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authcode, pathKey, sidKey := getLiveSessionParams(c)
 
-		if env.GCE && authcode == "" {
-			disconnectLiveSessionGCE(env)(c)
+		if env.Vconfig.GetBool("multihost.enabled") && authcode == "" {
+			disconnectLiveSessionMultiHost(env)(c)
 			return
 		}
 
@@ -249,7 +249,7 @@ func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func disconnectLiveSessionGCE(env *config.Env) func(c *gin.Context) {
+func disconnectLiveSessionMultiHost(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authcode, pathKey, _ := getLiveSessionParams(c)
 
@@ -282,8 +282,8 @@ func liveSessionWS(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authcode, pathKey, sidKey := getLiveSessionParams(c)
 
-		if env.GCE && authcode == "" {
-			liveSessionWSGCE(env)(c)
+		if env.Vconfig.GetBool("multihost.enabled") && authcode == "" {
+			liveSessionWSMultiHost(env)(c)
 			return
 		}
 
@@ -383,7 +383,7 @@ func liveSessionWS(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func liveSessionWSGCE(env *config.Env) func(c *gin.Context) {
+func liveSessionWSMultiHost(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authcode, pathKey, _ := getLiveSessionParams(c)
 

@@ -108,7 +108,7 @@ func (p *ProxyHandler) Serve() {
 					meta.SSHShellSessions = append(meta.SSHShellSessions, chanInfo)
 					meta.Mutex.Unlock()
 
-					if p.env.GCE {
+					if p.env.Vconfig.GetBool("multihost.enabled") {
 						wholeCommand := ""
 
 						for _, r := range chanInfo.Reqs {
@@ -137,7 +137,7 @@ func (p *ProxyHandler) Serve() {
 							Command:  wholeCommand,
 							AuthCode: RandStringBytesMaskImprSrc(20),
 							WS:       p.RemoteAddr().String(),
-							Bastion:  GetOutboundIP().String() + p.env.HTTPPort,
+							Bastion:  GetOutboundIP(p.env).String() + p.env.HTTPPort,
 						}
 
 						if meta.SSHServerClient.User != nil {

@@ -83,14 +83,9 @@
                 type: $(this).attr('method'),
                 data: $(this).serialize(),
                 success: function (data) {
-                    console.log(data);
-                },
-                error: function (jXHR, textStatus, errorThrown) {
-                    alert(errorThrown);
+                    window.location.reload();
                 }
             });
-
-            window.location.reload();
         });
 
         $("#userModal").modal({

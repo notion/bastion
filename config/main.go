@@ -76,7 +76,6 @@ type LiveSession struct {
 
 // Env is our main context. A pointer of this is passed almost everywhere
 type Env struct {
-	GCE              bool
 	ForceGeneration  bool
 	PKPassphrase     string
 	SSHServerClients *sync.Map
@@ -194,11 +193,13 @@ func Load(forceCerts bool) *Env {
 		red.Println("Error initializing google cloud storage", err)
 	}
 
-	bucketName := vconfig.GetString("gce.bucket")
-	logsBucket := storageClient.Bucket(bucketName)
+	var logsBucket *storage.BucketHandle
+	if vconfig.GetBool("gce.bucket.enabled") {
+		bucketName := vconfig.GetString("gce.bucket.name")
+		logsBucket = storageClient.Bucket(bucketName)
+	}
 
 	return &Env{
-		GCE:              vconfig.GetBool("gce.enabled"),
 		ForceGeneration:  forceCerts,
 		PKPassphrase:     vconfig.GetString("pkpassphrase"),
 		SSHServerClients: &sync.Map{},

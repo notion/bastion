@@ -5,12 +5,13 @@ import (
 	"compress/gzip"
 	"context"
 	"io"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/gorilla/websocket"
 	"github.com/notion/bastion/asciicast"
 	"golang.org/x/crypto/ssh"
@@ -45,20 +46,32 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 		closer.Host = client.SSHServerClient.ProxyTo
 		closer.Hostname = client.SSHServerClient.ProxyToHostname
 		closer.Name = client.SSHServerClient.Client.RemoteAddr().String()
+		closer.FileName = closer.Time.Format("2006-01-02 15:04:05") + " " + closer.Name
 		closer.Users = closer.User.Email
 	}
 
+	var w io.WriteCloser
 	if env.LogsBucket != nil {
 		bkt := env.LogsBucket
 
 		ctx := context.Background()
 
-		objHandler := bkt.Object(closer.Time.Format("2006-01-02 15:04:05") + " " + closer.Name)
-		w := objHandler.NewWriter(ctx)
+		objHandler := bkt.Object(closer.FileName)
+		w = objHandler.NewWriter(ctx)
 
 		closer.BkWriter = w
 		closer.BkContext = ctx
+	} else if env.Vconfig.GetBool("sessions.enabled") {
+		_ = os.Mkdir(env.Vconfig.GetString("sessions.directory"), os.ModePerm)
 
+		file, err := os.Create(path.Join(env.Vconfig.GetString("sessions.directory"), closer.FileName))
+		if err != nil {
+			env.Red.Println("Error creating file to disk", err)
+		}
+		closer.BkWriter = file
+	}
+
+	if w != nil {
 		closer.GZWriter = gzip.NewWriter(w)
 
 		marshalledHeader, err := closer.Cast.Header.Marshal()
@@ -82,12 +95,13 @@ type AsciicastReadCloser struct {
 	io.ReadCloser
 
 	Name        string
+	FileName    string
 	SSHConn     ssh.ConnMetadata
 	Cast        *asciicast.Cast
 	Time        time.Time
 	Buffer      bytes.Buffer
 	Env         *Env
-	BkWriter    *storage.Writer
+	BkWriter    io.WriteCloser
 	BkContext   context.Context
 	GZWriter    *gzip.Writer
 	User        *User
@@ -207,7 +221,7 @@ func (lr *AsciicastReadCloser) Close() error {
 	}
 
 	session := &Session{
-		Name:     lr.BkWriter.Name,
+		Name:     lr.FileName,
 		Time:     lr.Time,
 		Cast:     data,
 		Host:     lr.Host,
@@ -222,7 +236,7 @@ func (lr *AsciicastReadCloser) Close() error {
 
 	lr.Env.DB.Save(session)
 
-	if lr.Env.GCE {
+	if lr.Env.Vconfig.GetBool("multihost.enabled") {
 		lr.Env.DB.Delete(&LiveSession{}, lr.ChanInfo.DBID)
 	}
 
