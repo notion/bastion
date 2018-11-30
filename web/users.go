@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/sessions"
@@ -19,7 +21,7 @@ func user(env *config.Env) func(c *gin.Context) {
 		retData := make(map[string]interface{})
 		var users []config.User
 
-		env.DB.Find(&users)
+		env.DB.Preload("AuthRules").Find(&users)
 
 		retData["status"] = "ok"
 		retData["users"] = users
@@ -33,14 +35,32 @@ func updateUser(env *config.Env) func(c *gin.Context) {
 		id, _ := c.Params.Get("id")
 		retData := make(map[string]interface{})
 		var user config.User
+		rules := make([]config.AuthRules, 0)
 
-		env.DB.Find(&user, id)
+		env.DB.Preload("AuthRules").Find(&user, id)
 
 		user.Email = c.PostForm("email")
 		user.Authorized = c.PostForm("authorized") == "on"
 		user.Admin = c.PostForm("admin") == "on"
 		user.AuthorizedHosts = c.PostForm("authorizedhosts")
 		user.UnixUser = c.PostForm("unixuser")
+
+		env.DB.Model(&user).Association("AuthRules").Clear()
+
+		authRules := c.PostForm("authrules")
+		if authRules != "" {
+			for _, v := range strings.Split(authRules, ",") {
+				place, err := strconv.Atoi(strings.TrimSpace(v))
+				if err != nil {
+					env.Red.Println("error casting string to int for ID")
+				}
+				rule := config.AuthRules{}
+				rule.ID = uint(place)
+				env.DB.Find(&rule)
+				rules = append(rules, rule)
+			}
+		}
+		user.AuthRules = rules
 
 		if user.Authorized && user.Cert == nil || c.Query("override") == "on" {
 			if signer == nil {

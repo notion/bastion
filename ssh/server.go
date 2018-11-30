@@ -112,17 +112,24 @@ func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr
 					if serverClientInterface, ok := env.SSHServerClients.Load(SSHConn.RemoteAddr().String()); ok {
 						serverClient := serverClientInterface.(*config.SSHServerClient)
 
-						if serverClient.User.AuthorizedHosts != "" {
-							regexMatch, err := regexp.MatchString(serverClient.User.AuthorizedHosts, host)
-							if err != nil {
-								env.Red.Println("Unable to match regex for host:", err)
+						authed := false
+						for _, v := range GetRegexMatches(serverClient.User) {
+							if v == "" {
+								continue
 							}
 
-							if !regexMatch {
-								closeConn(nil)
-								return
+							regexMatch, err := regexp.MatchString(v, host)
+							if err != nil {
+								env.Red.Println("Unable to match regex for host:", err)
+								break
 							}
-						} else {
+
+							if regexMatch {
+								authed = true
+							}
+						}
+
+						if !authed {
 							closeConn(nil)
 							return
 						}
@@ -192,7 +199,7 @@ func getSSHServerConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 			keyData := ssh.MarshalAuthorizedKey(key)
 			var sessionUser config.User
 
-			if env.DB.First(&sessionUser, "cert = ?", keyData).RecordNotFound() {
+			if env.DB.Preload("AuthRules").First(&sessionUser, "cert = ?", keyData).RecordNotFound() {
 				return nil, errors.New("user cannot be found")
 			}
 

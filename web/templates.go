@@ -35,6 +35,15 @@ func userTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
+func authRuleTempl(env *config.Env) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		userData := session.Get("user").(*config.User)
+
+		c.HTML(http.StatusOK, "authrule", userData)
+	}
+}
+
 func noaccessTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)

@@ -237,3 +237,14 @@ func GetOutboundIP(env *config.Env) net.IP {
 
 	return localAddr.IP
 }
+
+// GetRegexMatches will return a slice of all of the matching regexes for a user
+func GetRegexMatches(user *config.User) []string {
+	matchers := []string{user.AuthorizedHosts}
+
+	for _, v := range user.AuthRules {
+		matchers = append(matchers, v.AuthorizedHosts)
+	}
+
+	return matchers
+}

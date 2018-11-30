@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -138,12 +140,16 @@ func session(env *config.Env) func(c *gin.Context) {
 func sessionID(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id, _ := c.Params.Get("id")
-		ctx := context.Background()
 
-		reader, err := env.LogsBucket.Object(id).ReadCompressed(true).NewReader(ctx)
-		if err != nil {
-			c.Writer.WriteHeader(http.StatusNotFound)
-		} else {
+		if env.Vconfig.GetBool("gce.bucket.enabled") {
+			ctx := context.Background()
+
+			reader, err := env.LogsBucket.Object(id).ReadCompressed(true).NewReader(ctx)
+			if err != nil {
+				c.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+
 			c.Header("Content-Encoding", "gzip")
 
 			if !env.Vconfig.GetBool("gce.lb.enabled") {
@@ -152,6 +158,20 @@ func sessionID(env *config.Env) func(c *gin.Context) {
 
 			c.Writer.WriteHeader(http.StatusOK)
 			io.Copy(c.Writer, reader)
+		} else if env.Vconfig.GetBool("sessions.enabled") {
+			c.Header("Content-Encoding", "gzip")
+			c.Header("Transfer-Encoding", "gzip")
+
+			file, err := os.Open(path.Join(env.Vconfig.GetString("sessions.directory"), id))
+			if err != nil {
+				c.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+
+			c.Writer.WriteHeader(http.StatusOK)
+			io.Copy(c.Writer, file)
+		} else {
+			c.AbortWithStatus(http.StatusNotFound)
 		}
 	}
 }

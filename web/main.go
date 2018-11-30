@@ -46,6 +46,7 @@ func Serve(addr string, env *config.Env) {
 		authedGroup.GET("/sessions", sessionTempl(env))
 		authedGroup.GET("/livesessions", liveSessionTempl(env))
 		authedGroup.GET("/users", userTempl(env))
+		authedGroup.GET("/authrules", authRuleTempl(env))
 		authedGroup.GET("/noaccess", noaccessTempl(env))
 		authedGroup.GET("/otp", otpTempl(env))
 		authedGroup.GET("/setupotp", setupOtpTempl(env))
@@ -58,6 +59,13 @@ func Serve(addr string, env *config.Env) {
 				userGroup.GET("", user(env))
 				userGroup.POST("/:id", updateUser(env))
 				userGroup.GET("/:id/keys", downloadKey(env))
+			}
+
+			authRulesGroup := apiGroup.Group("/authrules")
+			{
+				authRulesGroup.GET("", authRule(env))
+				authRulesGroup.POST("/:id", updateAuthRule(env))
+				authRulesGroup.GET("/:id/delete", deleteAuthRule(env))
 			}
 
 			wsGroup := apiGroup.Group("/ws")

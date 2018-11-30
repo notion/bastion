@@ -126,20 +126,27 @@ func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 				var stdoutBuf bytes.Buffer
 				session.Stdout = &stdoutBuf
 				session.Run("hostname")
+				proxyClient.SSHServerClient.ProxyToHostname = strings.TrimSpace(stdoutBuf.String())
 
-				if proxyClient.SSHServerClient.User.AuthorizedHosts != "" {
-					regexMatch, err := regexp.MatchString(proxyClient.SSHServerClient.User.AuthorizedHosts, strings.TrimSpace(stdoutBuf.String()))
+				authed := false
+				for _, v := range GetRegexMatches(proxyClient.SSHServerClient.User) {
+					if v == "" {
+						continue
+					}
+
+					regexMatch, err := regexp.MatchString(v, proxyClient.SSHServerClient.ProxyToHostname)
 					if err != nil {
 						env.Red.Println("Unable to match regex for host:", err)
+						break
 					}
 
-					proxyClient.SSHServerClient.ProxyToHostname = strings.TrimSpace(stdoutBuf.String())
-
-					if !regexMatch {
-						return nil, errors.New("no authorization for host")
+					if regexMatch {
+						authed = true
 					}
-				} else {
-					return nil, errors.New("user has no authorization for hosts")
+				}
+
+				if !authed {
+					return nil, errors.New("no authorization for host")
 				}
 
 				realClient, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)

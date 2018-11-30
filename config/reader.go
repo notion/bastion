@@ -69,6 +69,7 @@ func NewAsciicastReadCloser(r io.ReadCloser, conn ssh.ConnMetadata, width int, h
 			env.Red.Println("Error creating file to disk", err)
 		}
 		closer.BkWriter = file
+		w = file
 	}
 
 	if w != nil {

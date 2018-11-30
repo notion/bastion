@@ -13,6 +13,7 @@
                 <th>Unix User</th>
                 <th>Edit</th>
                 <th>Download Certs</th>
+                <th>Auth Rules</th>
             </tr>
             </thead>
             <tbody>
@@ -51,11 +52,15 @@
                 </div>
                 <div class="form-group">
                     <label for="unixuser">Authorized Hosts</label>
-                    <input type="text" class="form-control" id="authorizedhosts" placeholder="Unix User" value="${user.AuthorizedHosts}" name="authorizedhosts">
+                    <input type="text" class="form-control" id="authorizedhosts" placeholder="Authorized Hosts" value="${user.AuthorizedHosts}" name="authorizedhosts">
                 </div>
                 <div class="form-group">
                     <label for="unixuser">Unix User</label>
                     <input type="text" class="form-control" id="unixuser" placeholder="Unix User" value="${user.UnixUser}" name="unixuser">
+                </div>
+                <div class="form-group">
+                    <label for="authrules">Auth Rules</label>
+                    <input type="text" class="form-control" id="authrules" placeholder="Auth Rules" value="${user.AuthRules ? user.AuthRules.map(d => d.ID).join(',') : ''}" name="authrules">
                 </div>
                 <div class="checkbox">
                     <label>
@@ -109,6 +114,7 @@
                             <th>${user.UnixUser}</th>
                             <td><button onclick="editUser(${user.ID}, ${elem})" class="btn btn-primary">Edit</button></td>
                             <td><a href="/api/users/${user.ID}/keys" class="btn btn-primary">Download Keys</a></td>
+                            <td><pre>${JSON.stringify(user.AuthRules, null, 4)}</pre></td>
                         </tr>
                     `);
                 }
