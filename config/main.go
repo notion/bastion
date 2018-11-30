@@ -137,6 +137,7 @@ type ConnReq struct {
 	ReqType  string
 	ReqData  []byte
 	ReqReply bool
+	DBID     uint
 }
 
 // ConnChan handles logged data from an SSH Channel

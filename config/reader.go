@@ -202,6 +202,7 @@ func (lr *AsciicastReadCloser) Close() error {
 		lr.Env.Red.Println("Error logging session", err)
 	}
 
+	var dbid uint
 	if val, ok := lr.Env.SSHProxyClients.Load(lr.SSHConn.RemoteAddr().String()); ok {
 		client := val.(*SSHProxyClient)
 
@@ -214,6 +215,7 @@ func (lr *AsciicastReadCloser) Close() error {
 				} else {
 					command = string(v.ReqData)
 				}
+				dbid = v.DBID
 				lr.Cast.Header.Command = command
 				break
 			}
@@ -238,7 +240,7 @@ func (lr *AsciicastReadCloser) Close() error {
 	lr.Env.DB.Save(session)
 
 	if lr.Env.Vconfig.GetBool("multihost.enabled") {
-		lr.Env.DB.Delete(&LiveSession{}, lr.ChanInfo.DBID)
+		lr.Env.DB.Delete(&LiveSession{}, dbid)
 	}
 
 	err = lr.GZWriter.Close()

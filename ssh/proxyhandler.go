@@ -145,6 +145,7 @@ func (p *ProxyHandler) Serve() {
 						}
 
 						p.env.DB.Save(livesession)
+						reqInfo.DBID = livesession.ID
 						chanInfo.DBID = livesession.ID
 					}
 				case "exit-status":
