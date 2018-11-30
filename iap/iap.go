@@ -72,7 +72,7 @@ func (i *IAP) Verify(assertion string) (bool, jwt.MapClaims, error) {
 			if claims.VerifyAudience(i.Audience, true) && claims.VerifyIssuer(i.Issuer, true) {
 				if hd, ok := claims["hd"].(string); ok {
 					for _, v := range i.HostedDomains {
-						if v == hd {
+						if v == hd || v == "any" {
 							return true, claims, nil
 						}
 					}
