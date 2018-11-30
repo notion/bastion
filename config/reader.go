@@ -202,8 +202,14 @@ func (lr *AsciicastReadCloser) Close() error {
 		lr.Env.Red.Println("Error logging session", err)
 	}
 
+	dbid := lr.ChanInfo.DBID
 	if val, ok := lr.Env.SSHProxyClients.Load(lr.SSHConn.RemoteAddr().String()); ok {
 		client := val.(*SSHProxyClient)
+
+		sid, err := strconv.Atoi(lr.SidKey)
+		if err == nil {
+			dbid = client.SSHShellSessions[sid].DBID
+		}
 
 		client.Mutex.Lock()
 		for _, v := range lr.ChanInfo.Reqs {
@@ -239,19 +245,6 @@ func (lr *AsciicastReadCloser) Close() error {
 	lr.Env.DB.Save(session)
 
 	if lr.Env.Vconfig.GetBool("multihost.enabled") {
-		dbid := lr.ChanInfo.DBID
-		sid, err := strconv.Atoi(lr.SidKey)
-
-		connreqs := make([]*ConnReq, 0)
-		for _, v := range lr.ChanInfo.Reqs {
-			if v.ReqType == "shell" {
-				connreqs = append(connreqs, v)
-			}
-		}
-
-		if err == nil && sid < len(connreqs) {
-			dbid = connreqs[sid].DBID
-		}
 		lr.Env.DB.Delete(&LiveSession{}, dbid)
 	}
 
