@@ -241,8 +241,16 @@ func (lr *AsciicastReadCloser) Close() error {
 	if lr.Env.Vconfig.GetBool("multihost.enabled") {
 		dbid := lr.ChanInfo.DBID
 		sid, err := strconv.Atoi(lr.SidKey)
-		if err == nil && sid < len(lr.ChanInfo.Reqs) {
-			dbid = lr.ChanInfo.Reqs[sid].DBID
+
+		connreqs := make([]*ConnReq, 0)
+		for _, v := range lr.ChanInfo.Reqs {
+			if v.ReqType == "shell" {
+				connreqs = append(connreqs, v)
+			}
+		}
+
+		if err == nil && sid < len(connreqs) {
+			dbid = connreqs[sid].DBID
 		}
 		lr.Env.DB.Delete(&LiveSession{}, dbid)
 	}
