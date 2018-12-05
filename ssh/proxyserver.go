@@ -3,6 +3,7 @@ package ssh
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -88,6 +89,11 @@ func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 
 			if proxClient, ok := env.SSHProxyClients.Load(c.RemoteAddr().String()); ok {
 				proxyClient := proxClient.(*config.SSHProxyClient)
+
+				if len(proxyClient.SSHServerClient.Errors) > 0 {
+					return nil, nil
+				}
+
 				duration := time.Minute * 1
 				casigner := NewCASigner(serverSigner, duration, []string{}, []string{})
 
@@ -111,12 +117,14 @@ func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 					Auth: []ssh.AuthMethod{
 						ssh.PublicKeys(certsigner),
 					},
+					Timeout: 2 * time.Second,
 				}
 
 				client, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
 				if err != nil {
+					proxyClient.SSHServerClient.Errors = append(proxyClient.SSHServerClient.Errors, fmt.Errorf("Error in proxy authentication: %s", err))
 					env.Red.Println("Error in proxy authentication:", err)
-					return nil, err
+					return nil, nil
 				}
 
 				session, _ := client.NewSession()
@@ -146,13 +154,15 @@ func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 				}
 
 				if !authed {
-					return nil, errors.New("no authorization for host")
+					proxyClient.SSHServerClient.Errors = append(proxyClient.SSHServerClient.Errors, fmt.Errorf("You are not authorized to login to host: %s", proxyClient.SSHServerClient.ProxyToHostname))
+					return nil, nil
 				}
 
 				realClient, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
 				if err != nil {
+					proxyClient.SSHServerClient.Errors = append(proxyClient.SSHServerClient.Errors, fmt.Errorf("Error in proxy authentication: %s", err))
 					env.Red.Println("Error in proxy authentication:", err)
-					return nil, err
+					return nil, nil
 				}
 
 				proxyClient.SSHClient = realClient

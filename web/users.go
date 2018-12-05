@@ -62,7 +62,7 @@ func updateUser(env *config.Env) func(c *gin.Context) {
 		}
 		user.AuthRules = rules
 
-		if user.Authorized && user.Cert == nil || c.Query("override") == "on" {
+		if user.Authorized && user.Cert == nil || c.PostForm("override") == "on" {
 			if signer == nil {
 				signer = ssh.ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
 			}

@@ -120,6 +120,7 @@ type SSHServerClient struct {
 	PublicKey       ssh.PublicKey
 	Agent           *agent.Agent
 	User            *User
+	Errors          []error
 }
 
 // SSHProxyClient is a struct containing the proxy (server's) SSH connection
@@ -137,7 +138,6 @@ type ConnReq struct {
 	ReqType  string
 	ReqData  []byte
 	ReqReply bool
-	DBID     uint
 }
 
 // ConnChan handles logged data from an SSH Channel

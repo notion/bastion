@@ -37,15 +37,27 @@ func (p *ProxyHandler) Serve() {
 	go ssh.DiscardRequests(clientReqs)
 
 	for openedChannel := range clientChans {
-		proxyChannel, proxyReqs, err := proxyConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
-		if err != nil {
-			p.env.Red.Println("Couldn't accept channel on proxy:", err)
-			return
-		}
-
+		var proxyChannel ssh.Channel
+		var proxyReqs <-chan *ssh.Request
 		clientChannel, clientReqs2, err := openedChannel.Accept()
 		if err != nil {
 			p.env.Red.Println("Couldn't accept channel on client:", err)
+			return
+		}
+
+		if len(meta.SSHServerClient.Errors) > 0 {
+			for _, v := range meta.SSHServerClient.Errors {
+				clientChannel.Write([]byte("[bastion] " + v.Error()))
+				clientChannel.Write([]byte{'\r', '\n'})
+			}
+
+			clientChannel.Close()
+			return
+		}
+
+		proxyChannel, proxyReqs, err = proxyConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
+		if err != nil {
+			p.env.Red.Println("Couldn't accept channel on proxy:", err)
 			return
 		}
 
@@ -145,7 +157,6 @@ func (p *ProxyHandler) Serve() {
 						}
 
 						p.env.DB.Save(livesession)
-						reqInfo.DBID = livesession.ID
 						chanInfo.DBID = livesession.ID
 					}
 				case "exit-status":

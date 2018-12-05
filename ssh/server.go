@@ -2,7 +2,6 @@ package ssh
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -130,8 +129,7 @@ func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr
 						}
 
 						if !authed {
-							closeConn(nil)
-							return
+							serverClient.Errors = append(serverClient.Errors, fmt.Errorf("You are not authorized to login to host: %s", host))
 						}
 
 						serverClient.Username = SSHConn.User()
@@ -140,8 +138,7 @@ func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr
 						rawProxyConn, err := net.Dial("tcp", proxyAddr)
 						if err != nil {
 							env.Red.Println("Unable to establish connection to TCP Socket:", err)
-							closeConn(rawProxyConn)
-							return
+							serverClient.Errors = append(serverClient.Errors, fmt.Errorf("Unable to establish remote TCP Socket: %s", err))
 						}
 
 						env.SSHProxyClients.Store(rawProxyConn.LocalAddr().String(), &config.SSHProxyClient{
@@ -179,10 +176,18 @@ func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr
 func getSSHServerConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 	userSigner := ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
 
+	passOnce := 0
 	return &ssh.ServerConfig{
 		NoClientAuth: false,
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			env.Yellow.Printf("Login attempt: %s, user %s key: %s", c.RemoteAddr(), c.User(), key)
+			sessionUser := &config.User{}
+
+			clientConfig := &config.SSHServerClient{
+				Errors: make([]error, 0),
+				User:   sessionUser,
+			}
+			env.SSHServerClients.Store(c.RemoteAddr().String(), clientConfig)
 
 			certcheck := &ssh.CertChecker{
 				IsUserAuthority: func(auth ssh.PublicKey) bool {
@@ -193,23 +198,26 @@ func getSSHServerConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 			perms, err := certcheck.Authenticate(c, key)
 			if err != nil {
 				env.Red.Println("Unable to verify certificate:", err)
-				return nil, errors.New("Unable to authenticate Key/Token")
+				clientConfig.Errors = append(clientConfig.Errors, fmt.Errorf("Unable to verify certificate: %s", err))
+
+				if err.Error() == "ssh: normal key pairs not accepted" {
+					return nil, err
+				} else {
+					return nil, nil
+				}
 			}
 
 			keyData := ssh.MarshalAuthorizedKey(key)
-			var sessionUser config.User
 
 			if env.DB.Preload("AuthRules").First(&sessionUser, "cert = ?", keyData).RecordNotFound() {
-				return nil, errors.New("user cannot be found")
+				clientConfig.Errors = append(clientConfig.Errors, fmt.Errorf("Unable to find user"))
+				return nil, nil
 			}
 
 			if !sessionUser.Authorized {
-				return nil, errors.New("user is not authorized")
+				clientConfig.Errors = append(clientConfig.Errors, fmt.Errorf("User is not authorized: %s", sessionUser.Email))
+				return nil, nil
 			}
-
-			env.SSHServerClients.Store(c.RemoteAddr().String(), &config.SSHServerClient{
-				User: &sessionUser,
-			})
 
 			return perms, nil
 		},

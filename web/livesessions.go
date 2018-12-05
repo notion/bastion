@@ -108,7 +108,7 @@ func liveSessionMultiHost(env *config.Env) func(c *gin.Context) {
 			"hostname",
 			"ws",
 			"command",
-		}).Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").QueryExpr())
+		}).Where("id in (?)", env.DB.Table("live_sessions").Select([]string{"MAX(id) as id"}).Group("name").Where(map[string]interface{}{"deleted_at": nil}).QueryExpr())
 
 		type res struct {
 			Name  string

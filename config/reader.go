@@ -203,30 +203,25 @@ func (lr *AsciicastReadCloser) Close() error {
 	}
 
 	dbid := lr.ChanInfo.DBID
-	// if val, ok := lr.Env.SSHProxyClients.Load(lr.SSHConn.RemoteAddr().String()); ok {
-	// 	client := val.(*SSHProxyClient)
+	if val, ok := lr.Env.SSHProxyClients.Load(lr.SSHConn.RemoteAddr().String()); ok {
+		client := val.(*SSHProxyClient)
 
-	// 	sid, err := strconv.Atoi(lr.SidKey)
-	// 	if err == nil {
-	// 		dbid = client.SSHShellSessions[sid].DBID
-	// 	}
+		client.Mutex.Lock()
+		for _, v := range lr.ChanInfo.Reqs {
+			if v.ReqType == "shell" || v.ReqType == "exec" {
+				command := ""
+				if string(v.ReqData) == "" {
+					command = "Main Shell"
+				} else {
+					command = string(v.ReqData)
+				}
 
-	// 	client.Mutex.Lock()
-	// 	for _, v := range lr.ChanInfo.Reqs {
-	// 		if v.ReqType == "shell" || v.ReqType == "exec" {
-	// 			command := ""
-	// 			if string(v.ReqData) == "" {
-	// 				command = "Main Shell"
-	// 			} else {
-	// 				command = string(v.ReqData)
-	// 			}
-
-	// 			lr.Cast.Header.Command = command
-	// 			break
-	// 		}
-	// 	}
-	// 	client.Mutex.Unlock()
-	// }
+				lr.Cast.Header.Command = command
+				break
+			}
+		}
+		client.Mutex.Unlock()
+	}
 
 	session := &Session{
 		Name:     lr.FileName,
