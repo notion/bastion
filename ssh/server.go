@@ -176,7 +176,6 @@ func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr
 func getSSHServerConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 	userSigner := ParsePrivateKey(env.Config.UserPrivateKey, env.PKPassphrase, env)
 
-	passOnce := 0
 	return &ssh.ServerConfig{
 		NoClientAuth: false,
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
@@ -202,9 +201,9 @@ func getSSHServerConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 
 				if err.Error() == "ssh: normal key pairs not accepted" {
 					return nil, err
-				} else {
-					return nil, nil
 				}
+
+				return nil, nil
 			}
 
 			keyData := ssh.MarshalAuthorizedKey(key)
