@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/fatih/color"
+	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"  // Load MySQL for GORM
@@ -23,12 +24,17 @@ func Load(forceCerts bool, webAddr string, sshAddr string, sshProxyAddr string, 
 
 	vconfig.SetConfigFile(configFile)
 	vconfig.ReadInConfig()
+	vconfig.WatchConfig()
 
 	red := NewColorLog(color.New(color.FgRed))
 	green := NewColorLog(color.New(color.FgGreen))
 	yellow := NewColorLog(color.New(color.FgYellow))
 	blue := NewColorLog(color.New(color.FgBlue))
 	magenta := NewColorLog(color.New(color.FgMagenta))
+
+	vconfig.OnConfigChange(func(e fsnotify.Event) {
+		green.Println("Reloaded configuration file.")
+	})
 
 	var db *gorm.DB
 	var err error

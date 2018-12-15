@@ -23,6 +23,7 @@ gce:
       enabled: false
 multihost:
   enabled: false
+  hostname: ""
   ip: ""
 oauthcredentials:
   clientid: 0000000000000-foobar.apps.googleusercontent.com

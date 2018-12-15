@@ -20,12 +20,12 @@ var (
 	bastionSessionsTotal = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "sessions", "total"),
 		"Number of total bastion sessions",
-		[]string{"host"}, nil,
+		[]string{"bastionhost", "bastionip"}, nil,
 	)
 	bastionSessions = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "sessions", "uptime"),
 		"Bastion sessions and their uptime",
-		[]string{"host", "user", "proxyhost", "hostname", "uptime", "userip", "id"}, nil,
+		[]string{"bastionhost", "bastionip", "user", "proxyhost", "proxyip", "uptime", "userip", "id"}, nil,
 	)
 )
 
@@ -43,12 +43,13 @@ func (c BastionCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect is the prometheus collector's way to assign values to metrics
 func (c BastionCollector) Collect(ch chan<- prometheus.Metric) {
-	bastionSessionsTotals := getBastionSessionsTotal(c)
+	bastionSessionsTotals, hostnames := getBastionSessionsTotal(c)
 	for host, val := range bastionSessionsTotals {
 		ch <- prometheus.MustNewConstMetric(
 			bastionSessionsTotal,
 			prometheus.GaugeValue,
 			float64(val),
+			hostnames[host],
 			host,
 		)
 	}
@@ -59,10 +60,11 @@ func (c BastionCollector) Collect(ch chan<- prometheus.Metric) {
 			bastionSessions,
 			prometheus.GaugeValue,
 			float64(val["uptime"].(time.Time).Unix()),
-			val["host"].(string),
+			val["bastionhost"].(string),
+			val["bastionip"].(string),
 			val["user"].(string),
 			val["proxyhost"].(string),
-			val["hostname"].(string),
+			val["proxyip"].(string),
 			val["uptime"].(time.Time).Format("2006-01-02 15:04:05"),
 			val["userip"].(string),
 			val["id"].(string),

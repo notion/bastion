@@ -3,6 +3,15 @@ package config
 import (
 	"log"
 	"net"
+	"os"
+	"sync"
+)
+
+var (
+	serverIP       net.IP
+	serverHostname string
+	ipMu           = &sync.Mutex{}
+	hostMu         = &sync.Mutex{}
 )
 
 // GetOutboundIP get's the outbound internal ip
@@ -12,17 +21,45 @@ func GetOutboundIP(env *Env) net.IP {
 	if ip != "" {
 		realIP := net.ParseIP(ip)
 		if realIP != nil {
-			return realIP
+			return serverIP
 		}
 	}
 
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		log.Fatal(err)
+	if serverIP == nil {
+		ipMu.Lock()
+		defer ipMu.Unlock()
+
+		conn, err := net.Dial("udp", "8.8.8.8:80")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer conn.Close()
+
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+		serverIP = localAddr.IP
 	}
-	defer conn.Close()
 
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return serverIP
+}
 
-	return localAddr.IP
+// GetHostname returns the hostname of the machine the bastion is running on
+func GetHostname(env *Env) string {
+	hostname := env.Vconfig.GetString("multihost.hostname")
+	if hostname != "" {
+		return hostname
+	}
+
+	if serverHostname == "" {
+		hostMu.Lock()
+
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = "unknown"
+		}
+
+		serverHostname = hostname
+	}
+
+	return serverHostname
 }

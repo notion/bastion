@@ -57,14 +57,15 @@ type Session struct {
 // LiveSession is the model for a specific live SSH session
 type LiveSession struct {
 	gorm.Model
-	Name     string `gorm:"type:MEDIUMTEXT;"`
-	WS       string `gorm:"type:MEDIUMTEXT;"`
-	Time     time.Time
-	UserID   uint
-	User     *User
-	Host     string `gorm:"type:MEDIUMTEXT;"`
-	Hostname string `gorm:"type:MEDIUMTEXT;"`
-	Command  string `gorm:"type:MEDIUMTEXT;"`
-	Bastion  string `gorm:"type:MEDIUMTEXT;"`
-	AuthCode string `gorm:"type:MEDIUMTEXT;"`
+	Name            string `gorm:"type:MEDIUMTEXT;"`
+	WS              string `gorm:"type:MEDIUMTEXT;"`
+	Time            time.Time
+	UserID          uint
+	User            *User
+	Host            string `gorm:"type:MEDIUMTEXT;"`
+	Hostname        string `gorm:"type:MEDIUMTEXT;"`
+	Command         string `gorm:"type:MEDIUMTEXT;"`
+	Bastion         string `gorm:"type:MEDIUMTEXT;"`
+	BastionHostname string `gorm:"type:MEDIUMTEXT;"`
+	AuthCode        string `gorm:"type:MEDIUMTEXT;"`
 }

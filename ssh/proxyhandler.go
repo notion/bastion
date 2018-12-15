@@ -142,14 +142,15 @@ func (p *ProxyHandler) Serve() {
 						}
 
 						livesession := &config.LiveSession{
-							Name:     meta.SSHServerClient.Client.RemoteAddr().String(),
-							Time:     time.Now(),
-							Host:     meta.SSHServerClient.ProxyTo,
-							Hostname: meta.SSHServerClient.ProxyToHostname,
-							Command:  wholeCommand,
-							AuthCode: RandStringBytesMaskImprSrc(20),
-							WS:       p.RemoteAddr().String(),
-							Bastion:  config.GetOutboundIP(p.env).String() + p.env.HTTPPort,
+							Name:            meta.SSHServerClient.Client.RemoteAddr().String(),
+							Time:            time.Now(),
+							Host:            meta.SSHServerClient.ProxyTo,
+							Hostname:        meta.SSHServerClient.ProxyToHostname,
+							Command:         wholeCommand,
+							AuthCode:        RandStringBytesMaskImprSrc(20),
+							WS:              p.RemoteAddr().String(),
+							Bastion:         config.GetOutboundIP(p.env).String() + p.env.HTTPPort,
+							BastionHostname: config.GetHostname(p.env),
 						}
 
 						if meta.SSHServerClient.User != nil {
