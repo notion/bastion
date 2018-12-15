@@ -52,6 +52,7 @@ func GetHostname(env *Env) string {
 
 	if serverHostname == "" {
 		hostMu.Lock()
+		defer hostMu.Unlock()
 
 		hostname, err := os.Hostname()
 		if err != nil {
