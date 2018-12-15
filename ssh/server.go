@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/notion/bastion/proxyprotocol"
 
@@ -40,7 +41,7 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 
 		var proxConn net.Conn
 		if env.Vconfig.GetBool("gce.lb.proxyproto.enabled") {
-			proxConn = proxyprotocol.ParseConn(tcpConn)
+			proxConn = proxyprotocol.ParseConn(tcpConn, env.Vconfig.GetBool("debug"))
 		} else {
 			proxConn = tcpConn
 		}
@@ -185,6 +186,7 @@ func getSSHServerConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 			clientConfig := &config.SSHServerClient{
 				Errors: make([]error, 0),
 				User:   sessionUser,
+				Time:   time.Now(),
 			}
 			env.SSHServerClients.Store(c.RemoteAddr().String(), clientConfig)
 

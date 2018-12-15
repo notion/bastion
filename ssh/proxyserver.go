@@ -18,7 +18,7 @@ import (
 
 func startProxyServer(addr string, env *config.Env) {
 	signer := ParsePrivateKey(env.Config.PrivateKey, env.PKPassphrase, env)
-	sshConfig := getSSHProxyConfig(env, signer)
+	sshConfig := getSSHProxyConfig(env)
 
 	sshConfig.AddHostKey(signer)
 
@@ -79,7 +79,7 @@ func startProxyServer(addr string, env *config.Env) {
 	}
 }
 
-func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
+func getSSHProxyConfig(env *config.Env) *ssh.ServerConfig {
 	serverSigner := ParsePrivateKey(env.Config.ServerPrivateKey, env.PKPassphrase, env)
 
 	return &ssh.ServerConfig{
@@ -102,9 +102,9 @@ func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 					env.Red.Println("Unable to sign PK:", err)
 				}
 
-				signer = ParsePrivateKey(PK, env.PKPassphrase, env)
+				newSigner := ParsePrivateKey(PK, env.PKPassphrase, env)
 
-				certsigner, err := ssh.NewCertSigner(cert, signer)
+				certsigner, err := ssh.NewCertSigner(cert, newSigner)
 				if err != nil {
 					env.Red.Println("Error loading cert signer:", err)
 				}
@@ -129,7 +129,6 @@ func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 
 				session, _ := client.NewSession()
 				defer session.Close()
-				defer client.Close()
 
 				var stdoutBuf bytes.Buffer
 				session.Stdout = &stdoutBuf
@@ -154,18 +153,12 @@ func getSSHProxyConfig(env *config.Env, signer ssh.Signer) *ssh.ServerConfig {
 				}
 
 				if !authed {
+					defer client.Close()
 					proxyClient.SSHServerClient.Errors = append(proxyClient.SSHServerClient.Errors, fmt.Errorf("You are not authorized to login to host: %s", proxyClient.SSHServerClient.ProxyToHostname))
 					return nil, nil
 				}
 
-				realClient, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
-				if err != nil {
-					proxyClient.SSHServerClient.Errors = append(proxyClient.SSHServerClient.Errors, fmt.Errorf("Error in proxy authentication: %s", err))
-					env.Red.Println("Error in proxy authentication:", err)
-					return nil, nil
-				}
-
-				proxyClient.SSHClient = realClient
+				proxyClient.SSHClient = client
 
 				return nil, err
 			}

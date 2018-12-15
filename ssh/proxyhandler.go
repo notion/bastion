@@ -149,7 +149,7 @@ func (p *ProxyHandler) Serve() {
 							Command:  wholeCommand,
 							AuthCode: RandStringBytesMaskImprSrc(20),
 							WS:       p.RemoteAddr().String(),
-							Bastion:  GetOutboundIP(p.env).String() + p.env.HTTPPort,
+							Bastion:  config.GetOutboundIP(p.env).String() + p.env.HTTPPort,
 						}
 
 						if meta.SSHServerClient.User != nil {

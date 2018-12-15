@@ -2,6 +2,7 @@
 *.db
 *.log
 *.cast
+bastion
 build/
 sessions/
 config.yml

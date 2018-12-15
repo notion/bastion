@@ -10,11 +10,11 @@ import (
 )
 
 // ParseConn wraps a connection
-func ParseConn(mainConn net.Conn) *Conn {
+func ParseConn(mainConn net.Conn, loggingEnabled bool) *Conn {
 	reader := bufio.NewReader(mainConn)
 
 	header, err := proxyproto.Read(reader)
-	if err != nil {
+	if err != nil && loggingEnabled {
 		log.Println(err)
 	}
 
