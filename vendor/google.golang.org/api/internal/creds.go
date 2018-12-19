@@ -15,10 +15,10 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 
-	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 )
 
@@ -27,6 +27,9 @@ import (
 func Creds(ctx context.Context, ds *DialSettings) (*google.DefaultCredentials, error) {
 	if ds.Credentials != nil {
 		return ds.Credentials, nil
+	}
+	if ds.CredentialsJSON != nil {
+		return google.CredentialsFromJSON(ctx, ds.CredentialsJSON, ds.Scopes...)
 	}
 	if ds.CredentialsFile != "" {
 		data, err := ioutil.ReadFile(ds.CredentialsFile)

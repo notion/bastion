@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/gob"
 	"net/http"
+	"runtime"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-contrib/sessions"
@@ -37,7 +38,14 @@ func Serve(addr string, env *config.Env) {
 	r := gin.Default()
 	r.Use(sessions.Sessions("session", store))
 	r.LoadHTMLGlob("web/templates/*")
-	pprof.Register(r, nil)
+
+	if env.Vconfig.GetBool("debug") {
+		runtime.SetBlockProfileRate(1)
+		runtime.SetMutexProfileFraction(1)
+
+		pprof.Register(r)
+		r.GET("/api/opensessions", openSessions(env))
+	}
 
 	authedGroup := r.Group("/", authMiddleware(env))
 	{
@@ -83,9 +91,19 @@ func Serve(addr string, env *config.Env) {
 		}
 	}
 
-	r.GET("/api/opensessions", openSessions(env))
-
 	env.Green.Println("Running HTTP server at:", addr)
 
 	env.Red.Fatal(r.Run(addr))
+}
+
+func ginifyHandlerFunc(h http.HandlerFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		h(c.Writer, c.Request)
+	}
+}
+
+func ginifyHandler(h http.Handler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
 }

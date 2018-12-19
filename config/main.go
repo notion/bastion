@@ -44,6 +44,9 @@ func Load(forceCerts bool, webAddr string, sshAddr string, sshProxyAddr string, 
 		db, err = gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", vconfig.GetString("dbinfo.user"), vconfig.GetString("dbinfo.pass"), vconfig.GetString("dbinfo.host"), vconfig.GetString("dbinfo.port"), vconfig.GetString("dbinfo.name")))
 	}
 
+	db.Callback().Create().Before("gorm:create").Register("sanitize_inputs", sanitizeInputs)
+	db.Callback().Update().Before("gorm:update").Register("sanitize_inputs", sanitizeInputs)
+
 	if err != nil {
 		red.Println("Error loading config:", err)
 	}

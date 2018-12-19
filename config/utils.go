@@ -5,6 +5,9 @@ import (
 	"net"
 	"os"
 	"sync"
+
+	"github.com/jinzhu/gorm"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 var (
@@ -12,6 +15,7 @@ var (
 	serverHostname string
 	ipMu           = &sync.Mutex{}
 	hostMu         = &sync.Mutex{}
+	sanitizePolicy = bluemonday.StrictPolicy()
 )
 
 // GetOutboundIP get's the outbound internal ip
@@ -63,4 +67,21 @@ func GetHostname(env *Env) string {
 	}
 
 	return serverHostname
+}
+
+func sanitizeInputs(scope *gorm.Scope) {
+	if _, ok := scope.Get("gorm:update_column"); !ok {
+		if !scope.HasError() {
+			if scope.Value != nil {
+				ref := scope.IndirectValue()
+				for i := 0; i < ref.NumField(); i++ {
+					field := ref.Field(i)
+
+					if field.Type().Name() == "string" {
+						field.SetString(sanitizePolicy.Sanitize(field.String()))
+					}
+				}
+			}
+		}
+	}
 }
