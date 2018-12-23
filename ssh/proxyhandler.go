@@ -32,13 +32,125 @@ func (p *ProxyHandler) Serve() {
 		return
 	}
 
+	stopped := false
+
 	proxyConn := meta.SSHClient
 
 	go ssh.DiscardRequests(clientReqs)
 
+	go func() {
+		for openedChannel := range meta.SSHClientChans {
+			if stopped {
+				break
+			}
+
+			p.env.Green.Println(openedChannel.ChannelType(), openedChannel.ExtraData(), string(openedChannel.ExtraData()))
+			proxyChannel, proxyReqs, err := openedChannel.Accept()
+			if err != nil {
+				p.env.Red.Println("Couldn't accept channel on proxy:", err)
+				return
+			}
+
+			clientChannel, clientReqs2, err := clientConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
+			if err != nil {
+				p.env.Red.Println("Couldn't accept channel on proxy:", err)
+				return
+			}
+
+			closeParentChans := func() {
+				proxyChannel.Close()
+				clientChannel.Close()
+			}
+
+			go func() {
+				for {
+					var req *ssh.Request
+					var dst ssh.Channel
+					var reqFrom string
+					var dstTo string
+
+					select {
+					case req = <-clientReqs2:
+						dst = proxyChannel
+						reqFrom = "client"
+						dstTo = "proxy"
+					case req = <-proxyReqs:
+						dst = clientChannel
+						reqFrom = "proxy"
+						dstTo = "client"
+					}
+
+					if req == nil || dst == nil {
+						break
+					}
+
+					b, err := dst.SendRequest(req.Type, req.WantReply, req.Payload)
+					p.env.Green.Println(reqFrom, dstTo, req.Type, req.WantReply, string(req.Payload), req.Payload, b)
+					if err != nil {
+						p.env.Red.Println("Error sending request through channel:", err)
+					}
+
+					if req.WantReply {
+						req.Reply(b, nil)
+					}
+
+					if stopped {
+						break
+					}
+				}
+
+				timer := time.NewTimer(1 * time.Second)
+				<-timer.C
+				closeParentChans()
+			}()
+
+			chanInfo := &config.ConnChan{
+				ChannelType: openedChannel.ChannelType(),
+				ChannelData: openedChannel.ExtraData(),
+				Reqs:        make([]*config.ConnReq, 0),
+				ClientConn:  clientConn,
+				ProxyConn:   proxyConn,
+				ProxyChan:   &proxyChannel,
+				ClientChan:  &clientChannel,
+			}
+
+			var wrappedClientChannel io.ReadCloser = clientChannel
+			var wrappedProxyChannel = config.NewAsciicastReadCloser(proxyChannel, clientConn, 80, 40, chanInfo, p.env)
+
+			closeChans := func() {
+				wrappedClientChannel.Close()
+				wrappedProxyChannel.Close()
+
+				closeParentChans()
+			}
+
+			allClose := func() {
+				closeChans()
+			}
+
+			var once sync.Once
+			go func() {
+				io.Copy(clientChannel, wrappedProxyChannel)
+				timer := time.NewTimer(1 * time.Second)
+				<-timer.C
+				once.Do(allClose)
+			}()
+			go func() {
+				io.Copy(proxyChannel, wrappedClientChannel)
+				timer := time.NewTimer(1 * time.Second)
+				<-timer.C
+				once.Do(allClose)
+			}()
+
+			defer once.Do(allClose)
+		}
+	}()
+
 	for openedChannel := range clientChans {
-		var proxyChannel ssh.Channel
-		var proxyReqs <-chan *ssh.Request
+		if stopped {
+			break
+		}
+
 		clientChannel, clientReqs2, err := openedChannel.Accept()
 		if err != nil {
 			p.env.Red.Println("Couldn't accept channel on client:", err)
@@ -55,7 +167,7 @@ func (p *ProxyHandler) Serve() {
 			return
 		}
 
-		proxyChannel, proxyReqs, err = proxyConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
+		proxyChannel, proxyReqs, err := proxyConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
 		if err != nil {
 			p.env.Red.Println("Couldn't accept channel on proxy:", err)
 			return
@@ -78,24 +190,29 @@ func (p *ProxyHandler) Serve() {
 		}
 
 		go func() {
-
-		r:
 			for {
 				var req *ssh.Request
 				var dst ssh.Channel
+				var reqFrom string
+				var dstTo string
 
 				select {
 				case req = <-clientReqs2:
 					dst = proxyChannel
+					reqFrom = "client"
+					dstTo = "proxy"
 				case req = <-proxyReqs:
 					dst = clientChannel
+					reqFrom = "proxy"
+					dstTo = "client"
 				}
 
 				if req == nil || dst == nil {
-					break r
+					break
 				}
 
 				b, err := dst.SendRequest(req.Type, req.WantReply, req.Payload)
+				p.env.Green.Println(reqFrom, dstTo, req.Type, req.WantReply, string(req.Payload), req.Payload, b)
 				if err != nil {
 					p.env.Red.Println("Error sending request through channel:", err)
 				}
@@ -161,7 +278,11 @@ func (p *ProxyHandler) Serve() {
 						chanInfo.DBID = livesession.ID
 					}
 				case "exit-status":
-					break r
+					stopped = true
+				}
+
+				if stopped {
+					break
 				}
 			}
 

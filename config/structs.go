@@ -58,7 +58,10 @@ type SSHServerClient struct {
 // SSHProxyClient is a struct containing the proxy (server's) SSH connection
 type SSHProxyClient struct {
 	Client           net.Conn
+	SSHConn          ssh.Conn
 	SSHClient        *ssh.Client
+	SSHClientChans   <-chan ssh.NewChannel
+	SSHClientReqs    <-chan *ssh.Request
 	SSHServerClient  *SSHServerClient
 	SSHShellSessions []*ConnChan
 	SSHChans         []*ConnChan
@@ -78,7 +81,7 @@ type ConnChan struct {
 	ChannelData []byte
 	Reqs        []*ConnReq
 	ClientConn  *ssh.ServerConn
-	ProxyConn   *ssh.Client
+	ProxyConn   ssh.Conn
 	ProxyChan   *ssh.Channel
 	ClientChan  *ssh.Channel
 	Closer      *AsciicastReadCloser

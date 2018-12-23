@@ -120,12 +120,21 @@ func getSSHProxyConfig(env *config.Env) *ssh.ServerConfig {
 					Timeout: 2 * time.Second,
 				}
 
-				client, err := ssh.Dial("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig)
+				rawProxyConn, err := net.DialTimeout("tcp", proxyClient.SSHServerClient.ProxyTo, clientConfig.Timeout)
 				if err != nil {
 					proxyClient.SSHServerClient.Errors = append(proxyClient.SSHServerClient.Errors, fmt.Errorf("Error in proxy authentication: %s", err))
 					env.Red.Println("Error in proxy authentication:", err)
 					return nil, nil
 				}
+
+				proxyConn, proxyChans, proxyReqs, err := ssh.NewClientConn(rawProxyConn, proxyClient.SSHServerClient.ProxyTo, clientConfig)
+				if err != nil {
+					proxyClient.SSHServerClient.Errors = append(proxyClient.SSHServerClient.Errors, fmt.Errorf("Error in proxy authentication: %s", err))
+					env.Red.Println("Error in proxy authentication:", err)
+					return nil, nil
+				}
+
+				client := ssh.NewClient(proxyConn, make(chan ssh.NewChannel, 0), make(chan *ssh.Request, 0))
 
 				session, _ := client.NewSession()
 				defer session.Close()
@@ -159,6 +168,9 @@ func getSSHProxyConfig(env *config.Env) *ssh.ServerConfig {
 				}
 
 				proxyClient.SSHClient = client
+				proxyClient.SSHConn = proxyConn
+				proxyClient.SSHClientChans = proxyChans
+				proxyClient.SSHClientReqs = proxyReqs
 
 				return nil, err
 			}
