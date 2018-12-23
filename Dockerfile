@@ -5,6 +5,6 @@ WORKDIR /usr/local/go/src/github.com/notion/bastion
 COPY . .
 COPY config.example.yml config.yml
 
-RUN go install -v ./...
+RUN go install
 
 CMD ["bastion"]

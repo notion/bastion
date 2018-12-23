@@ -1,0 +1,9 @@
+.idea/
+*.db
+*.log
+*.cast
+bastion
+build/
+sessions/
+config.yml
+credentials.json
