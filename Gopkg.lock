@@ -216,11 +216,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:73405a734b6495d7ff09ff24a86633b56bc13917ea9adef16f3d8cccaea176c2"
+  digest = "1:81abe06bccf5e35235e8d6387508a4f3417393216e62bd4c2e383bbebd4b4fbb"
   name = "github.com/koding/websocketproxy"
   packages = ["."]
   pruneopts = "UT"
-  revision = "0fa3f994f6e724d94f7299587cee4ba089152c9d"
+  revision = "7ed82d81a28c9ba1ed6fd1157ce714760f214c98"
 
 [[projects]]
   digest = "1:c568d7727aa262c32bdf8a3f7db83614f7af0ed661474b24588de635c20024c7"
@@ -263,12 +263,12 @@
   version = "v1.0.1"
 
 [[projects]]
-  digest = "1:1fc201f179a7d45f944655de3cdbfb0a8a226fd525569454e31ca87f9e4bb677"
+  digest = "1:6ff1026b8d873d074ddec82ad60bb0eb537dc013f456ef26b63d30beba2f99e7"
   name = "github.com/microcosm-cc/bluemonday"
   packages = ["."]
   pruneopts = "UT"
-  revision = "82c7118e8ccf7403d4860175d97bb635e8e28239"
-  version = "v1.0.1"
+  revision = "506f3da9b7c86d737e91f16b7431df8635871552"
+  version = "v1.0.2"
 
 [[projects]]
   digest = "1:53bc4cd4914cd7cd52139990d5170d6dc99067ae31c56530621b18b35fc30318"
@@ -475,7 +475,7 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "e147a9138326bc0e9d4e179541ffd8af41cff8a9"
+  revision = "927f97764cc334a6575f4b7a1584a147864d5723"
 
 [[projects]]
   branch = "master"
@@ -493,11 +493,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:48a949ee15f5f03524b792547822221b07f828dd26522b5e08688f25a10d14c1"
+  digest = "1:9652da56be8fe4998e79e36be6b9d30fe4fd4aacb73ecf0d9b3a33228189dc7e"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "074acd46bca67915925527c07849494d115e7c43"
+  revision = "b4a75ba826a64a70990f11a225237acd6ef35c9f"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -539,10 +539,10 @@
     "transport/http/internal/propagation",
   ]
   pruneopts = "UT"
-  revision = "146117f78c63efe78e04021cc321e59fb3c13e50"
+  revision = "65a46cafb132eff435c7d1e0f439cc73c8eebb85"
 
 [[projects]]
-  digest = "1:caa22aaff120905a9e4cd4ebb716f6a96f868f93c59e1cb1ab055439cd806778"
+  digest = "1:7bc25c2efff76b31f146caf630c617be9b666c6164f0632050466fbec0500125"
   name = "google.golang.org/appengine"
   packages = [
     ".",
@@ -558,8 +558,8 @@
     "urlfetch",
   ]
   pruneopts = "UT"
-  revision = "4a4468ece617fc8205e99368fa2200e9d1fad421"
-  version = "v1.3.0"
+  revision = "e9657d882bb81064595ca3b56cbe2546bbabf7b1"
+  version = "v1.4.0"
 
 [[projects]]
   branch = "master"
@@ -572,7 +572,7 @@
     "googleapis/rpc/status",
   ]
   pruneopts = "UT"
-  revision = "5a97ab628bfb2f65f6befec18f4bc7bc7f382b77"
+  revision = "bd9b4fb69e2ffd37621a6caa54dcbead29b546f2"
 
 [[projects]]
   digest = "1:9edd250a3c46675d0679d87540b30c9ed253b19bd1fd1af08f4f5fb3c79fc487"
