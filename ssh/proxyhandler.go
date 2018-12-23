@@ -65,18 +65,12 @@ func (p *ProxyHandler) Serve() {
 				for {
 					var req *ssh.Request
 					var dst ssh.Channel
-					var reqFrom string
-					var dstTo string
 
 					select {
 					case req = <-clientReqs2:
 						dst = proxyChannel
-						reqFrom = "client"
-						dstTo = "proxy"
 					case req = <-proxyReqs:
 						dst = clientChannel
-						reqFrom = "proxy"
-						dstTo = "client"
 					}
 
 					if req == nil || dst == nil {
@@ -191,18 +185,12 @@ func (p *ProxyHandler) Serve() {
 			for {
 				var req *ssh.Request
 				var dst ssh.Channel
-				var reqFrom string
-				var dstTo string
 
 				select {
 				case req = <-clientReqs2:
 					dst = proxyChannel
-					reqFrom = "client"
-					dstTo = "proxy"
 				case req = <-proxyReqs:
 					dst = clientChannel
-					reqFrom = "proxy"
-					dstTo = "client"
 				}
 
 				if req == nil || dst == nil {

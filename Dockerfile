@@ -3,6 +3,9 @@ LABEL maintainer="Antonio Mika <me@antoniomika.me>"
 
 WORKDIR /usr/local/go/src/github.com/notion/bastion
 COPY . .
+
+RUN go mod download
+
 COPY config.example.yml config.yml
 
 RUN go install
