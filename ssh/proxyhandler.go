@@ -44,7 +44,6 @@ func (p *ProxyHandler) Serve() {
 				break
 			}
 
-			p.env.Green.Println(openedChannel.ChannelType(), openedChannel.ExtraData(), string(openedChannel.ExtraData()))
 			proxyChannel, proxyReqs, err := openedChannel.Accept()
 			if err != nil {
 				p.env.Red.Println("Couldn't accept channel on proxy:", err)
@@ -85,7 +84,6 @@ func (p *ProxyHandler) Serve() {
 					}
 
 					b, err := dst.SendRequest(req.Type, req.WantReply, req.Payload)
-					p.env.Green.Println(reqFrom, dstTo, req.Type, req.WantReply, string(req.Payload), req.Payload, b)
 					if err != nil {
 						p.env.Red.Println("Error sending request through channel:", err)
 					}
@@ -212,7 +210,6 @@ func (p *ProxyHandler) Serve() {
 				}
 
 				b, err := dst.SendRequest(req.Type, req.WantReply, req.Payload)
-				p.env.Green.Println(reqFrom, dstTo, req.Type, req.WantReply, string(req.Payload), req.Payload, b)
 				if err != nil {
 					p.env.Red.Println("Error sending request through channel:", err)
 				}
