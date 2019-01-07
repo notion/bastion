@@ -50,10 +50,10 @@ func Load(forceCerts bool, webAddr string, sshAddr string, sshProxyAddr string, 
 	if err != nil {
 		red.Println("Error loading config:", err)
 	}
-	db.LogMode(vconfig.GetBool("debug"))
+	db.LogMode(vconfig.GetBool("debug.db.enabled"))
 
 	releaseMode := gin.ReleaseMode
-	if vconfig.GetBool("debug") {
+	if vconfig.GetBool("debug.web.enabled") {
 		releaseMode = gin.DebugMode
 	}
 	gin.SetMode(releaseMode)

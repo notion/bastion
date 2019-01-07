@@ -6,7 +6,13 @@ dbinfo:
   port: 3306
   sqlite: true
   user: example
-debug: true
+debug:
+  db:
+    enabled: true
+  ssh:
+    enabled: true
+  web:
+    enabled: true
 gce:
   bucket:
     enabled: true

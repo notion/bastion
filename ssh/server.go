@@ -41,7 +41,7 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 
 		var proxConn net.Conn
 		if env.Vconfig.GetBool("gce.lb.proxyproto.enabled") {
-			proxConn = proxyprotocol.ParseConn(tcpConn, env.Vconfig.GetBool("debug"))
+			proxConn = proxyprotocol.ParseConn(tcpConn, env.Vconfig.GetBool("debug.ssh.enabled"))
 		} else {
 			proxConn = tcpConn
 		}

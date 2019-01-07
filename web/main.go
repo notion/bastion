@@ -39,7 +39,7 @@ func Serve(addr string, env *config.Env) {
 	r.Use(sessions.Sessions("session", store))
 	r.LoadHTMLGlob("web/templates/*")
 
-	if env.Vconfig.GetBool("debug") {
+	if env.Vconfig.GetBool("debug.web.enabled") {
 		runtime.SetBlockProfileRate(1)
 		runtime.SetMutexProfileFraction(1)
 
