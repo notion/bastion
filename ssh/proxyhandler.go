@@ -38,6 +38,7 @@ func (p *ProxyHandler) Serve() {
 
 	go ssh.DiscardRequests(clientReqs)
 
+	// Handle channel requests from the proxy side (connected server)
 	go func() {
 		for openedChannel := range meta.SSHClientChans {
 			if stopped {
@@ -138,6 +139,7 @@ func (p *ProxyHandler) Serve() {
 		}
 	}()
 
+	// Handle channel requests from the client side (connected client)
 	for openedChannel := range clientChans {
 		if stopped {
 			break
