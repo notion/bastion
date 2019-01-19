@@ -1,10 +1,5 @@
 {{ define "session" }}
 {{ template "header" .}}
-<style>
-    .modal-xl {
-        max-width: 90%;
-    }
-</style>
 <div class="row">
     <div id="sessions" style="width: 100%"><h4>Sessions:</h4>
         <table class="table table-striped table-bordered dt-responsive nowrap" id="sessions-table" cellspacing="0" width="100%">
@@ -45,57 +40,6 @@
 </div>
 
 <script>
-    var styles = {};
-
-    var codes = {
-        // reset: [0, 0],
-        //
-        // bold: [1, 22],
-        // dim: [2, 22],
-        // italic: [3, 23],
-        // underline: [4, 24],
-        // inverse: [7, 27],
-        // hidden: [8, 28],
-        // strikethrough: [9, 29],
-
-        black: [30, 39],
-        red: [31, 39],
-        green: [32, 39],
-        yellow: [33, 39],
-        blue: [34, 39],
-        magenta: [35, 39],
-        cyan: [36, 39],
-        white: [37, 39],
-        gray: [90, 39],
-        grey: [90, 39],
-
-        // bgBlack: [40, 49],
-        // bgRed: [41, 49],
-        // bgGreen: [42, 49],
-        // bgYellow: [43, 49],
-        // bgBlue: [44, 49],
-        // bgMagenta: [45, 49],
-        // bgCyan: [46, 49],
-        // bgWhite: [47, 49],
-        //
-        // // legacy styles for colors pre v1.0.0
-        // blackBG: [40, 49],
-        // redBG: [41, 49],
-        // greenBG: [42, 49],
-        // yellowBG: [43, 49],
-        // blueBG: [44, 49],
-        // magentaBG: [45, 49],
-        // cyanBG: [46, 49],
-        // whiteBG: [47, 49],
-    };
-
-    Object.keys(codes).forEach(function(key) {
-        var val = codes[key];
-        var style = styles[key] = [];
-        style.open = '\u001b[' + val[0] + 'm';
-        style.close = '\u001b[' + val[1] + 'm';
-    });
-
     function playCast(id) {
         $('#playerSessionModal').html(`
             <asciinema-player id="sessionPlayer" poster="npt:0:0.1" font-size="small" preload="true" cols="1000" rows="40" src="/api/sessions/${id}" idle-time-limit="1"></asciinema-player>
@@ -111,61 +55,64 @@
             <div id="terminal-container"></div>
         `);
 
-        $.get(`/api/sessions/${id}`, function(data) {
-            var users = {};
-            var usedColors = [];
-            term = new Terminal({
-                cursorBlink: true,
-                cols: 170,
-                rows: 35
-            });
-            term.open(document.getElementById("terminal-container"), true);
-            term.toggleFullscreen(true);
-
-            var lastTime = 0;
-            data.split("\n").forEach(function(data) {
-                try {
-                    var foo = JSON.parse(data);
-                    if (Array.isArray(foo)) {
-                        if (!(foo[3] in users)) {
-                            function getColor() {
-                                var colors = Object.keys(codes);
-                                var color = colors[Math.floor(Math.random() * colors.length)];
-                                if (usedColors.indexOf(color) === -1) {
-                                    return color
-                                } else {
-                                    return getColor();
-                                }
-                            }
-                            var color = getColor();
-                            users[foo[3]] = styles[color];
-                        }
-
-                        var open = users[foo[3]].open,
-                            close = users[foo[3]].close;
-
-                        var time = foo[0] * 1000;
-                        if (time - lastTime > 3000) {
-                            time = lastTime + 3000;
-                        }
-                        lastTime = time;
-
-                        setTimeout(function() {
-                            term.write(open + foo[2] + close);
-                        }, time);
-                    }
-                } catch(e) {
-                    return;
-                }
-            });
-        });
-
         $('#playModal').modal({
             show: true
+        });
+
+        $('#playModal').on('shown.bs.modal', function (e) {
+            $.get(`/api/sessions/${id}`, function(data) {
+                var users = {};
+                var usedColors = [];
+                
+                term = createTerminal();
+
+                var lastTime = 0;
+                data.split("\n").forEach(function(data) {
+                    try {
+                        var foo = JSON.parse(data);
+                        if (Array.isArray(foo)) {
+                            if (!(foo[3] in users)) {
+                                function getColor() {
+                                    var colors = Object.keys(codes);
+                                    var color = colors[Math.floor(Math.random() * colors.length)];
+                                    if (usedColors.indexOf(color) === -1) {
+                                        return color
+                                    } else {
+                                        return getColor();
+                                    }
+                                }
+                                var color = getColor();
+                                users[foo[3]] = styles[color];
+                            }
+
+                            var open = users[foo[3]].open,
+                                close = users[foo[3]].close;
+
+                            var time = foo[0] * 1000;
+                            if (time - lastTime > 3000) {
+                                time = lastTime + 3000;
+                            }
+                            lastTime = time;
+
+                            setTimeout(function() {
+                                term.write(open + foo[2] + close);
+                            }, time);
+                        }
+                    } catch(e) {
+                        return;
+                    }
+                });
+            });
         });
     }
 
     $(function() {
+        $('#playModal').on('hidden.bs.modal', function () {
+            if (typeof term != 'undefined') {
+                term.clear();
+            }
+        });
+
         sessions_table = $('#sessions-table').DataTable({
             buttons: [
                 'copy', 'csv', 'excel', 'pdf', 'print'

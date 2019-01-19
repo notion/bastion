@@ -1,15 +1,5 @@
 {{ define "livesession" }}
 {{ template "header" .}}
-<style>
-    .modal-xl {
-        max-width: 90%;
-    }
-
-    #terminal-container {
-        font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
-        font-size: 11px;
-    }
-</style>
 <div class="row">
     <div id="sessions" style="width: 100%"><h4>Live Sessions:</h4>
         <table class="table table-striped table-bordered dt-responsive nowrap" id="sessions-table" cellspacing="0" width="100%">
@@ -51,27 +41,18 @@
 
 <script>
     function playCast(id, sid) {
-        if (window.OpenSocket) {
-            window.OpenSocket.close();
-        }
+        $('#playModal').on('shown.bs.modal', function (e) {
+            if (window.OpenSocket) {
+                window.OpenSocket.close();
+            }
 
-        var scheme = "ws://";
-        if (window.location.protocol === "https:") {
-            scheme = "wss://";
-        }
-
-        var websocket = new WebSocket(scheme + window.location.hostname + ":" + window.location.port + "/api/ws/livesessions/" + id + "/" + sid);
-        websocket.onopen = function(evt) {
-            term = new Terminal({
-                cursorBlink: true,
-                cols: 170,
-                rows: 35
-            });
-            term.open(document.getElementById("terminal-container"), true);
-            term.toggleFullscreen(true);
-            term.attach(websocket);
-        };
-        window.OpenSocket = websocket;
+            var websocket = new WebSocket(scheme + window.location.hostname + ":" + window.location.port + "/api/ws/livesessions/" + id + "/" + sid);
+            websocket.onopen = function(evt) {
+                term = createTerminal();
+                term.attach(websocket);
+            };
+            window.OpenSocket = websocket;
+        });
 
         $('#playModal').modal({
             show: true

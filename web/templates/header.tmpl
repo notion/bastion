@@ -41,43 +41,23 @@
     <!-- Asciinema Stop -->
 
     <!-- XTerm -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/xterm.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/addons/fullscreen/fullscreen.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/addons/fit/fit.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/addons/attach/attach.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.10.0/xterm.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.10.0/addons/fullscreen/fullscreen.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.10.0/addons/fit/fit.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.10.0/addons/attach/attach.min.js"></script>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/xterm.min.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/2.9.2/addons/fullscreen/fullscreen.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.10.0/xterm.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.10.0/addons/fullscreen/fullscreen.min.css" />
     <!-- XTerm -->
 
-    <style>
-        #pageContainer {
-            padding-top: 60px;
-        }
-        .navbar {
-            max-height: 60px !important
-        }
-    </style>
+    <!-- Main Start -->
+    <script src="js/main.js"></script>
+
+    <link href="css/main.css" rel="stylesheet">
+    <!-- Main End -->
 </head>
 <body>
-<script>
-    var entityMap = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;',
-        '/': '&#x2F;',
-        '`': '&#x60;',
-        '=': '&#x3D;'
-    };
 
-    function escapeHtml(string) {
-        return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-            return entityMap[s];
-        });
-    }
-</script>
 <nav class="navbar navbar-expand-md fixed-top navbar-dark bg-primary" role="navigation">
     <a class="navbar-brand" href="/">SSH Bastion Admin</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">

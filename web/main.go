@@ -1,6 +1,7 @@
 package web
 
 import (
+	"github.com/gin-contrib/static"
 	"encoding/gob"
 	"net/http"
 	"runtime"
@@ -37,6 +38,7 @@ func Serve(addr string, env *config.Env) {
 
 	r := gin.Default()
 	r.Use(sessions.Sessions("session", store))
+	r.Use(static.Serve("/", static.LocalFile("web/static", false)))
 	r.LoadHTMLGlob("web/templates/*")
 
 	if env.Vconfig.GetBool("debug.web.enabled") {
