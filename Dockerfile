@@ -1,4 +1,4 @@
-FROM golang:1.11.3-stretch
+FROM golang:1.11.5-stretch
 LABEL maintainer="Antonio Mika <me@antoniomika.me>"
 
 WORKDIR /usr/local/go/src/github.com/notion/bastion
