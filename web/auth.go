@@ -17,7 +17,7 @@ import (
 
 var (
 	passPathsIfAuthedAndOtp = map[string]bool{
-		"/noaccess": true,
+		"/authenticated": true,
 	}
 
 	passPathsIfAuthed = map[string]bool{
@@ -55,7 +55,7 @@ func authMiddleware(env *config.Env) func(c *gin.Context) {
 					return
 				}
 
-				c.Redirect(http.StatusFound, "/noaccess")
+				c.Redirect(http.StatusFound, "/authenticated")
 				c.Abort()
 				return
 			}
@@ -105,7 +105,7 @@ func checkOtp(env *config.Env) func(c *gin.Context) {
 			session.Set("otpauthed", true)
 			session.Save()
 
-			c.Redirect(http.StatusFound, "/sessions")
+			c.Redirect(http.StatusFound, "/authenticated")
 			c.Abort()
 			return
 		}

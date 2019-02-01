@@ -36,7 +36,7 @@ func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 		if code == "" {
 			if loggedIn := session.Get("loggedin"); loggedIn != nil {
 				if loggedIn.(bool) {
-					http.Redirect(c.Writer, c.Request, "/sessions", http.StatusFound)
+					http.Redirect(c.Writer, c.Request, "/authenticated", http.StatusFound)
 					return
 				}
 			}
@@ -96,10 +96,6 @@ func index(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 				c.Abort()
 				return
 			}
-
-			c.Redirect(http.StatusFound, "/sessions")
-			c.Abort()
-			return
 		}
 
 		c.Redirect(http.StatusFound, "/")
@@ -150,7 +146,7 @@ func indexIAP(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 					return
 				}
 
-				c.Redirect(http.StatusFound, "/sessions")
+				c.Redirect(http.StatusFound, "/")
 				c.Abort()
 				return
 			}

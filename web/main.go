@@ -1,10 +1,11 @@
 package web
 
 import (
-	"github.com/gin-contrib/static"
 	"encoding/gob"
 	"net/http"
 	"runtime"
+
+	"github.com/gin-contrib/static"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-contrib/sessions"
@@ -57,7 +58,7 @@ func Serve(addr string, env *config.Env) {
 		authedGroup.GET("/livesessions", liveSessionTempl(env))
 		authedGroup.GET("/users", userTempl(env))
 		authedGroup.GET("/authrules", authRuleTempl(env))
-		authedGroup.GET("/noaccess", noaccessTempl(env))
+		authedGroup.GET("/authenticated", authTempl(env))
 		authedGroup.GET("/otp", otpTempl(env))
 		authedGroup.GET("/setupotp", setupOtpTempl(env))
 
