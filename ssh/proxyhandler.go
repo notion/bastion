@@ -32,123 +32,122 @@ func (p *ProxyHandler) Serve() {
 		return
 	}
 
-	stopped := false
-
 	proxyConn := meta.SSHClient
 
 	go ssh.DiscardRequests(clientReqs)
 
+	stopChan := make(chan bool)
+
 	// Handle channel requests from the proxy side (connected server)
 	go func() {
-		for openedChannel := range meta.SSHClientChans {
-			if stopped {
-				break
-			}
-
-			proxyChannel, proxyReqs, err := openedChannel.Accept()
-			if err != nil {
-				p.env.Red.Println("Couldn't accept channel on proxy:", err)
+		for {
+			select {
+			case <-stopChan:
 				return
-			}
-
-			clientChannel, clientReqs2, err := clientConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
-			if err != nil {
-				p.env.Red.Println("Couldn't accept channel on proxy:", err)
-				return
-			}
-
-			closeParentChans := func() {
-				proxyChannel.Close()
-				clientChannel.Close()
-			}
-
-			go func() {
-				for {
-					var req *ssh.Request
-					var dst ssh.Channel
-
-					select {
-					case req = <-clientReqs2:
-						dst = proxyChannel
-					case req = <-proxyReqs:
-						dst = clientChannel
-					}
-
-					if req == nil || dst == nil {
-						break
-					}
-
-					b, err := dst.SendRequest(req.Type, req.WantReply, req.Payload)
-					if err != nil {
-						p.env.Red.Println("Error sending request through channel:", err)
-					}
-
-					if req.WantReply {
-						req.Reply(b, nil)
-					}
-
-					if stopped {
-						break
-					}
+			case openedChannel := <-meta.SSHClientChans:
+				if openedChannel == nil {
+					return
 				}
 
-				timer := time.NewTimer(1 * time.Second)
-				<-timer.C
-				closeParentChans()
-			}()
+				proxyChannel, proxyReqs, err := openedChannel.Accept()
+				if err != nil {
+					p.env.Red.Println("Couldn't accept channel on proxy (proxy chans):", err)
+					continue
+				}
 
-			chanInfo := &config.ConnChan{
-				ChannelType: openedChannel.ChannelType(),
-				ChannelData: openedChannel.ExtraData(),
-				Reqs:        make([]*config.ConnReq, 0),
-				ClientConn:  clientConn,
-				ProxyConn:   proxyConn,
-				ProxyChan:   &proxyChannel,
-				ClientChan:  &clientChannel,
+				clientChannel, clientReqs2, err := clientConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
+				if err != nil {
+					p.env.Red.Println("Couldn't accept channel on client (proxy chans):", err)
+					proxyChannel.Close()
+					continue
+				}
+
+				closeParentChans := func() {
+					proxyChannel.Close()
+					clientChannel.Close()
+				}
+
+				go func() {
+				proxyLoop:
+					for {
+						var req *ssh.Request
+						var dst ssh.Channel
+
+						select {
+						case <-stopChan:
+							break proxyLoop
+						case req = <-clientReqs2:
+							dst = proxyChannel
+						case req = <-proxyReqs:
+							dst = clientChannel
+						}
+
+						if req == nil || dst == nil {
+							break
+						}
+
+						b, err := dst.SendRequest(req.Type, req.WantReply, req.Payload)
+						if err != nil {
+							p.env.Red.Println("Error sending request through channel:", err)
+						}
+
+						if req.WantReply {
+							req.Reply(b, nil)
+						}
+					}
+
+					timer := time.NewTimer(1 * time.Millisecond)
+					<-timer.C
+					closeParentChans()
+				}()
+
+				chanInfo := &config.ConnChan{
+					ChannelType: openedChannel.ChannelType(),
+					ChannelData: openedChannel.ExtraData(),
+					Reqs:        make([]*config.ConnReq, 0),
+					ClientConn:  clientConn,
+					ProxyConn:   proxyConn,
+					ProxyChan:   &proxyChannel,
+					ClientChan:  &clientChannel,
+				}
+
+				var wrappedClientChannel io.ReadCloser = clientChannel
+				var wrappedProxyChannel = config.NewAsciicastReadCloser(proxyChannel, clientConn, 80, 40, chanInfo, p.env)
+
+				closeChans := func() {
+					wrappedClientChannel.Close()
+					wrappedProxyChannel.Close()
+
+					closeParentChans()
+				}
+
+				allClose := func() {
+					closeChans()
+				}
+
+				go func() {
+					var wg sync.WaitGroup
+					wg.Add(1)
+
+					go func() {
+						defer wg.Done()
+						io.Copy(clientChannel, wrappedProxyChannel)
+					}()
+
+					io.Copy(proxyChannel, wrappedClientChannel)
+					WaitTimeout(&wg, 1*time.Second)
+					allClose()
+				}()
 			}
-
-			var wrappedClientChannel io.ReadCloser = clientChannel
-			var wrappedProxyChannel = config.NewAsciicastReadCloser(proxyChannel, clientConn, 80, 40, chanInfo, p.env)
-
-			closeChans := func() {
-				wrappedClientChannel.Close()
-				wrappedProxyChannel.Close()
-
-				closeParentChans()
-			}
-
-			allClose := func() {
-				closeChans()
-			}
-
-			var once sync.Once
-			go func() {
-				io.Copy(clientChannel, wrappedProxyChannel)
-				timer := time.NewTimer(1 * time.Second)
-				<-timer.C
-				once.Do(allClose)
-			}()
-			go func() {
-				io.Copy(proxyChannel, wrappedClientChannel)
-				timer := time.NewTimer(1 * time.Second)
-				<-timer.C
-				once.Do(allClose)
-			}()
-
-			defer once.Do(allClose)
 		}
 	}()
 
 	// Handle channel requests from the client side (connected client)
 	for openedChannel := range clientChans {
-		if stopped {
-			break
-		}
-
 		clientChannel, clientReqs2, err := openedChannel.Accept()
 		if err != nil {
-			p.env.Red.Println("Couldn't accept channel on client:", err)
-			return
+			p.env.Red.Println("Couldn't accept channel on client (client chans):", err)
+			continue
 		}
 
 		if len(meta.SSHServerClient.Errors) > 0 {
@@ -158,13 +157,14 @@ func (p *ProxyHandler) Serve() {
 			}
 
 			clientChannel.Close()
-			return
+			continue
 		}
 
 		proxyChannel, proxyReqs, err := proxyConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
 		if err != nil {
-			p.env.Red.Println("Couldn't accept channel on proxy:", err)
-			return
+			p.env.Red.Println("Couldn't accept channel on proxy (client chans):", err)
+			clientChannel.Close()
+			continue
 		}
 
 		chanInfo := &config.ConnChan{
@@ -184,6 +184,7 @@ func (p *ProxyHandler) Serve() {
 		}
 
 		go func() {
+		reqLoop:
 			for {
 				var req *ssh.Request
 				var dst ssh.Channel
@@ -265,15 +266,13 @@ func (p *ProxyHandler) Serve() {
 						chanInfo.DBID = livesession.ID
 					}
 				case "exit-status":
-					stopped = true
-				}
-
-				if stopped {
-					break
+					close(stopChan)
+					stopChan = make(chan bool)
+					break reqLoop
 				}
 			}
 
-			timer := time.NewTimer(1 * time.Second)
+			timer := time.NewTimer(1 * time.Millisecond)
 			<-timer.C
 			closeParentChans()
 		}()
@@ -292,21 +291,19 @@ func (p *ProxyHandler) Serve() {
 			closeChans()
 		}
 
-		var once sync.Once
 		go func() {
-			io.Copy(clientChannel, wrappedProxyChannel)
-			timer := time.NewTimer(1 * time.Second)
-			<-timer.C
-			once.Do(allClose)
-		}()
-		go func() {
-			io.Copy(proxyChannel, wrappedClientChannel)
-			timer := time.NewTimer(1 * time.Second)
-			<-timer.C
-			once.Do(allClose)
-		}()
+			var wg sync.WaitGroup
+			wg.Add(1)
 
-		defer once.Do(allClose)
+			go func() {
+				defer wg.Done()
+				io.Copy(clientChannel, wrappedProxyChannel)
+			}()
+
+			io.Copy(proxyChannel, wrappedClientChannel)
+			WaitTimeout(&wg, 1*time.Second)
+			allClose()
+		}()
 	}
 
 	cleanup := func() {
