@@ -45,6 +45,10 @@ func (p *ProxyHandler) Serve() {
 			case <-stopChan:
 				return
 			case openedChannel := <-meta.SSHClientChans:
+				if openedChannel == nil {
+					return
+				}
+
 				proxyChannel, proxyReqs, err := openedChannel.Accept()
 				if err != nil {
 					p.env.Red.Println("Couldn't accept channel on proxy (proxy chans):", err)
@@ -123,18 +127,15 @@ func (p *ProxyHandler) Serve() {
 
 				go func() {
 					var wg sync.WaitGroup
-					wg.Add(2)
+					wg.Add(1)
 
 					go func() {
 						defer wg.Done()
 						io.Copy(clientChannel, wrappedProxyChannel)
 					}()
-					go func() {
-						defer wg.Done()
-						io.Copy(proxyChannel, wrappedClientChannel)
-					}()
 
-					wg.Wait()
+					io.Copy(proxyChannel, wrappedClientChannel)
+					WaitTimeout(&wg, 1*time.Second)
 					allClose()
 				}()
 			}
@@ -266,6 +267,7 @@ func (p *ProxyHandler) Serve() {
 					}
 				case "exit-status":
 					close(stopChan)
+					stopChan = make(chan bool)
 					break reqLoop
 				}
 			}
@@ -291,19 +293,15 @@ func (p *ProxyHandler) Serve() {
 
 		go func() {
 			var wg sync.WaitGroup
-			wg.Add(2)
-
-			go func() {
-				defer wg.Done()
-				io.Copy(proxyChannel, wrappedClientChannel)
-			}()
+			wg.Add(1)
 
 			go func() {
 				defer wg.Done()
 				io.Copy(clientChannel, wrappedProxyChannel)
 			}()
 
-			wg.Wait()
+			io.Copy(proxyChannel, wrappedClientChannel)
+			WaitTimeout(&wg, 1*time.Second)
 			allClose()
 		}()
 	}
