@@ -39,28 +39,30 @@ func startServer(addr string, proxyAddr string, env *config.Env) {
 			continue
 		}
 
-		var proxConn net.Conn
-		if env.Vconfig.GetBool("gce.lb.proxyproto.enabled") {
-			proxConn = proxyprotocol.ParseConn(tcpConn, env.Vconfig.GetBool("debug.ssh.enabled"))
-		} else {
-			proxConn = tcpConn
-		}
+		go func() {
+			var proxConn net.Conn
+			if env.Vconfig.GetBool("gce.lb.proxyproto.enabled") {
+				proxConn = proxyprotocol.ParseConn(tcpConn, env.Vconfig.GetBool("debug.ssh.enabled"))
+			} else {
+				proxConn = tcpConn
+			}
 
-		SSHConn, chans, reqs, err := ssh.NewServerConn(proxConn, sshConfig)
-		if err != nil {
-			env.Red.Printf("Failed to handshake (%s)", err)
-			continue
-		}
+			SSHConn, chans, reqs, err := ssh.NewServerConn(proxConn, sshConfig)
+			if err != nil {
+				env.Red.Printf("Failed to handshake (%s)", err)
+				return
+			}
 
-		client, _ := env.SSHServerClients.Load(SSHConn.RemoteAddr().String())
-		SSHClient := client.(*config.SSHServerClient)
+			client, _ := env.SSHServerClients.Load(SSHConn.RemoteAddr().String())
+			SSHClient := client.(*config.SSHServerClient)
 
-		SSHClient.Client = SSHConn
+			SSHClient.Client = SSHConn
 
-		env.Green.Printf("New SSH connection from %s (%s)", SSHConn.RemoteAddr(), SSHConn.ClientVersion())
+			env.Green.Printf("New SSH connection from %s (%s)", SSHConn.RemoteAddr(), SSHConn.ClientVersion())
 
-		go ssh.DiscardRequests(reqs)
-		go handleChannels(chans, SSHConn, proxyAddr, env)
+			go ssh.DiscardRequests(reqs)
+			go handleChannels(chans, SSHConn, proxyAddr, env)
+		}()
 	}
 }
 
@@ -150,18 +152,10 @@ func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr
 							Mutex:            &sync.Mutex{},
 						})
 
-						var once sync.Once
 						go func() {
-							io.Copy(connection, rawProxyConn)
-							once.Do(func() {
-								closeConn(rawProxyConn)
-							})
-						}()
-						go func() {
+							go io.Copy(connection, rawProxyConn)
 							io.Copy(rawProxyConn, connection)
-							once.Do(func() {
-								closeConn(rawProxyConn)
-							})
+							closeConn(rawProxyConn)
 						}()
 					} else {
 						env.Red.Println("Unable to find ssh server client.")
