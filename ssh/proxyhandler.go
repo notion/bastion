@@ -40,6 +40,10 @@ func (p *ProxyHandler) Serve() {
 
 	// Handle channel requests from the proxy side (connected server)
 	go func() {
+		if proxyConn == nil {
+			return
+		}
+
 		for {
 			select {
 			case <-stopChan:
@@ -157,7 +161,7 @@ func (p *ProxyHandler) Serve() {
 			}
 
 			clientChannel.Close()
-			continue
+			return
 		}
 
 		proxyChannel, proxyReqs, err := proxyConn.OpenChannel(openedChannel.ChannelType(), openedChannel.ExtraData())
@@ -309,6 +313,7 @@ func (p *ProxyHandler) Serve() {
 	cleanup := func() {
 		clientConn.Close()
 		proxyConn.Close()
+		close(stopChan)
 	}
 
 	p.env.Magenta.Println("Closed proxy connection.")
