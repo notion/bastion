@@ -8,7 +8,7 @@ import (
 	"github.com/notion/bastion/config"
 )
 
-func sessionTempl(env *config.Env) func(c *gin.Context) {
+func SessionTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
@@ -17,7 +17,7 @@ func sessionTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func liveSessionTempl(env *config.Env) func(c *gin.Context) {
+func LiveSessionTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
@@ -26,7 +26,7 @@ func liveSessionTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func userTempl(env *config.Env) func(c *gin.Context) {
+func UserTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
@@ -35,7 +35,7 @@ func userTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func authRuleTempl(env *config.Env) func(c *gin.Context) {
+func AuthRuleTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
@@ -44,7 +44,7 @@ func authRuleTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func noaccessTempl(env *config.Env) func(c *gin.Context) {
+func NoaccessTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
@@ -61,7 +61,7 @@ func noaccessTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func otpTempl(env *config.Env) func(c *gin.Context) {
+func OtpTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
@@ -76,7 +76,7 @@ func otpTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func setupOtpTempl(env *config.Env) func(c *gin.Context) {
+func SetupOtpTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)

@@ -137,7 +137,7 @@ func session(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func sessionID(env *config.Env) func(c *gin.Context) {
+func SessionID(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id, _ := c.Params.Get("id")
 

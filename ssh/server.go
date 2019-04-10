@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/notion/bastion/proxyprotocol"
-
+	// "github.com/notion/bastion/alertsystem"
 	"github.com/notion/bastion/config"
 	"golang.org/x/crypto/ssh"
 )
@@ -137,6 +137,35 @@ func handleSession(newChannel ssh.NewChannel, SSHConn *ssh.ServerConn, proxyAddr
 						serverClient.ProxyTo = host
 
 						rawProxyConn, err := net.Dial("tcp", proxyAddr)
+
+						ipAddr := rawProxyConn.RemoteAddr().(*net.TCPAddr).IP
+						var network net.IP
+						if ipAddr.To4() != nil {
+							mask := net.CIDRMask(24, 32)
+							network = ipAddr.Mask(mask)
+						} else {
+							mask := net.CIDRMask(48, 128)
+							network = ipAddr.Mask(mask)
+						}
+
+						alertInfo := &config.AlertInfo{
+							User:       SSHConn.User(),
+							IP:         network,
+							Timestamp:  time.Now(),
+							LoginType:  "ssh",
+							Success:    true,
+							FirstLogin: false,
+							NewNetwork: false,
+							BeenAWhile: false,
+						}
+
+						if !authed {
+							alertInfo.Success = false
+							env.AlertChannel <- *alertInfo
+						} else {
+							env.AlertChannel <- *alertInfo
+						}
+
 						if err != nil {
 							env.Red.Println("Unable to establish connection to TCP Socket:", err)
 							serverClient.Errors = append(serverClient.Errors, fmt.Errorf("Unable to establish remote TCP Socket: %s", err))

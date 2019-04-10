@@ -15,7 +15,7 @@ import (
 	"github.com/notion/bastion/config"
 )
 
-func liveSession(env *config.Env) func(c *gin.Context) {
+func LiveSession(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		if env.Vconfig.GetBool("multihost.enabled") {
 			liveSessionMultiHost(env)(c)
@@ -207,7 +207,7 @@ func liveSessionMultiHost(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func disconnectLiveSession(env *config.Env) func(c *gin.Context) {
+func DisconnectLiveSession(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authcode, pathKey, sidKey := getLiveSessionParams(c)
 
@@ -272,13 +272,13 @@ func disconnectLiveSessionMultiHost(env *config.Env) func(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, map[string]interface{}{"status": false, "error": "Invalid auth code."})
 			return
 		} else {
-			disconnectLiveSession(env)(c)
+			DisconnectLiveSession(env)(c)
 			return
 		}
 	}
 }
 
-func liveSessionWS(env *config.Env) func(c *gin.Context) {
+func LiveSessionWS(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authcode, pathKey, sidKey := getLiveSessionParams(c)
 
@@ -402,7 +402,7 @@ func liveSessionWSMultiHost(env *config.Env) func(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, map[string]interface{}{"status": false, "error": "Invalid auth code."})
 			return
 		} else {
-			liveSessionWS(env)(c)
+			LiveSessionWS(env)(c)
 			return
 		}
 	}

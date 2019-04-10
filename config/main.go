@@ -12,6 +12,8 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"  // Load MySQL for GORM
 	_ "github.com/jinzhu/gorm/dialects/sqlite" // Load SQLite for GORM
+
+	// "github.com/notion/bastion/alertsystem"
 	"github.com/spf13/viper"
 	"google.golang.org/api/option"
 )
@@ -20,6 +22,12 @@ const configFile = "config.yml"
 
 // Load initializes the Env pointer with data from the database and elsewhere
 func Load(forceCerts bool, webAddr string, sshAddr string, sshProxyAddr string, monAddr string) *Env {
+	fmt.Println(forceCerts)
+	fmt.Println(webAddr)
+	fmt.Println(sshAddr)
+	fmt.Println(sshProxyAddr)
+	fmt.Println(monAddr)
+
 	vconfig := viper.New()
 
 	vconfig.SetConfigFile(configFile)
@@ -80,6 +88,8 @@ func Load(forceCerts bool, webAddr string, sshAddr string, sshProxyAddr string, 
 		logsBucket = storageClient.Bucket(bucketName)
 	}
 
+	alertChan := make(chan AlertInfo)
+
 	env := &Env{
 		ForceGeneration:  forceCerts,
 		PKPassphrase:     vconfig.GetString("pkpassphrase"),
@@ -95,11 +105,15 @@ func Load(forceCerts bool, webAddr string, sshAddr string, sshProxyAddr string, 
 		Yellow:           yellow,
 		Blue:             blue,
 		Magenta:          magenta,
+		AlertChannel:     alertChan,
 		HTTPPort:         webAddr,
 		SSHPort:          sshAddr,
 		SSHProxyPort:     sshProxyAddr,
 		MonPort:          monAddr,
 	}
+
+	Alert(alertChan, env)
+	env.Blue.Printf("started configuration")
 
 	if vconfig.GetBool("multihost.enabled") {
 		db.Delete(LiveSession{}, "bastion = ?", GetOutboundIP(env).String()+env.HTTPPort)

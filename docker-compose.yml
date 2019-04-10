@@ -1,0 +1,21 @@
+version: '3.7'
+
+services:
+  bastion:
+    build: ./
+    ports:
+      - "5222:5222"
+      - "8080:8080"
+    volumes: 
+      - ./config.example.yml:/go/src/github.com/notion/bastion/config.example.yml
+      - ./bastion.db:/go/src/github.com/notion/bastion/bastion.db
+  ssh:
+    image: rastasheep/ubuntu-sshd
+    command: |
+      /bin/bash -c "
+      apt-get update && apt-get install net-tools
+      echo 'TrustedUserCAKeys /etc/ssh/ca_keys' >> /etc/ssh/sshd_config
+      echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCrDZWuJDdOoW+0xpu+hyVqTGo5bmdQL3bZvtOLtbrLBIdrtGIAelSJpJVmjKceenYSoFPEAeSLklI1U0VEkLDRRaNt8MPBhTl8JHiaiLT3PizwKxXFBdN8lEIMQvyxeOEarxV4/Xi8qCS+sXEqpLs/IOY/83gs2eHuw6l38Z9KNd1KEyiQ2WHi6AnxXSuMTdHRmzxMBNnK77qPrQ+2ILgtZKiYDJdoNZU/Z+AEFz2KGlIUl71zxqaOebXf9fVKIGo+oFA3LhxtlfNCmY09U3Gfte6K9vLon+fAqXpwVIpkckLyAwDhffiS2g5KoAfAD2EnsSBjXpzL+9mPXlcoreM9' > /etc/ssh/ca_keys
+      ifconfig
+      /usr/sbin/sshd -D
+      "

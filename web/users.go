@@ -16,7 +16,7 @@ import (
 	cryptossh "golang.org/x/crypto/ssh"
 )
 
-func user(env *config.Env) func(c *gin.Context) {
+func User(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 		var users []config.User
@@ -30,7 +30,7 @@ func user(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func updateUser(env *config.Env) func(c *gin.Context) {
+func UpdateUser(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id, _ := c.Params.Get("id")
 		retData := make(map[string]interface{})
@@ -97,7 +97,7 @@ func updateUser(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func downloadKey(env *config.Env) func(c *gin.Context) {
+func DownloadKey(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		sessionUser := session.Get("user").(*config.User)

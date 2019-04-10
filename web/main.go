@@ -1,10 +1,11 @@
 package web
 
 import (
-	"github.com/gin-contrib/static"
 	"encoding/gob"
 	"net/http"
 	"runtime"
+
+	"github.com/gin-contrib/static"
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-contrib/sessions"
@@ -52,44 +53,44 @@ func Serve(addr string, env *config.Env) {
 	authedGroup := r.Group("/", authMiddleware(env))
 	{
 		authedGroup.GET("", index(env, oauthConfig))
-		authedGroup.GET("/logout", logout(env))
-		authedGroup.GET("/sessions", sessionTempl(env))
-		authedGroup.GET("/livesessions", liveSessionTempl(env))
-		authedGroup.GET("/users", userTempl(env))
-		authedGroup.GET("/authrules", authRuleTempl(env))
-		authedGroup.GET("/noaccess", noaccessTempl(env))
-		authedGroup.GET("/otp", otpTempl(env))
-		authedGroup.GET("/setupotp", setupOtpTempl(env))
+		authedGroup.GET("/logout", Logout(env))
+		authedGroup.GET("/sessions", SessionTempl(env))
+		authedGroup.GET("/livesessions", LiveSessionTempl(env))
+		authedGroup.GET("/users", UserTempl(env))
+		authedGroup.GET("/authrules", AuthRuleTempl(env))
+		authedGroup.GET("/noaccess", NoaccessTempl(env))
+		authedGroup.GET("/otp", OtpTempl(env))
+		authedGroup.GET("/setupotp", SetupOtpTempl(env))
 
 		apiGroup := authedGroup.Group("/api")
 		{
-			apiGroup.GET("/livesessions", liveSession(env))
+			apiGroup.GET("/livesessions", LiveSession(env))
 			userGroup := apiGroup.Group("/users")
 			{
-				userGroup.GET("", user(env))
-				userGroup.POST("/:id", updateUser(env))
-				userGroup.GET("/:id/keys", downloadKey(env))
+				userGroup.GET("", User(env))
+				userGroup.POST("/:id", UpdateUser(env))
+				userGroup.GET("/:id/keys", DownloadKey(env))
 			}
 
 			authRulesGroup := apiGroup.Group("/authrules")
 			{
-				authRulesGroup.GET("", authRule(env))
-				authRulesGroup.POST("/:id", updateAuthRule(env))
-				authRulesGroup.GET("/:id/delete", deleteAuthRule(env))
+				authRulesGroup.GET("", AuthRule(env))
+				authRulesGroup.POST("/:id", UpdateAuthRule(env))
+				authRulesGroup.GET("/:id/delete", DeleteAuthRule(env))
 			}
 
 			wsGroup := apiGroup.Group("/ws")
 			{
-				wsGroup.GET("/livesessions/:id", liveSessionWS(env))
-				wsGroup.GET("/livesessions/:id/:sid", liveSessionWS(env))
+				wsGroup.GET("/livesessions/:id", LiveSessionWS(env))
+				wsGroup.GET("/livesessions/:id/:sid", LiveSessionWS(env))
 			}
-			apiGroup.GET("/disconnect/:id", disconnectLiveSession(env))
-			apiGroup.GET("/disconnect/:id/:sid", disconnectLiveSession(env))
+			apiGroup.GET("/disconnect/:id", DisconnectLiveSession(env))
+			apiGroup.GET("/disconnect/:id/:sid", DisconnectLiveSession(env))
 			apiGroup.GET("/sessions", session(env))
-			apiGroup.GET("/sessions/:id", sessionID(env))
+			apiGroup.GET("/sessions/:id", SessionID(env))
 
-			apiGroup.POST("/otp", checkOtp(env))
-			apiGroup.GET("/setupotp", setupotp(env))
+			apiGroup.POST("/otp", CheckOtp(env))
+			apiGroup.GET("/setupotp", SetupOtp(env))
 		}
 	}
 
