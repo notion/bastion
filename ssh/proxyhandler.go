@@ -17,6 +17,11 @@ type ProxyHandler struct {
 	env    *config.Env
 }
 
+type setenvRequest struct {
+	Name  string
+	Value string
+}
+
 // Serve handles the proxy
 func (p *ProxyHandler) Serve() {
 	clientConn, clientChans, clientReqs, err := ssh.NewServerConn(p, p.config)
@@ -169,6 +174,13 @@ func (p *ProxyHandler) Serve() {
 			p.env.Red.Println("Couldn't accept channel on proxy (client chans):", err)
 			clientChannel.Close()
 			continue
+		}
+
+		if openedChannel.ChannelType() == "session" {
+			proxyChannel.SendRequest("env", true, ssh.Marshal(&setenvRequest{
+				Name:  "LC_BASTION_USER",
+				Value: meta.SSHServerClient.User.Email,
+			}))
 		}
 
 		chanInfo := &config.ConnChan{
