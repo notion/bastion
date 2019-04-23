@@ -46,7 +46,7 @@ func listenForLoginAlert(c chan AlertInfo, env *Env) {
 	}
 }
 
-// deque is fixed size so it doesn't just keep growing infinitely.
+// deque is fixed size so it doesn't just keep growing infinitely with more logins.
 func addToDeque(deque *Deque, timeSince float64, maxDataPoints int) {
 	if deque.Size() >= maxDataPoints {
 		deque.PopRight()
@@ -75,9 +75,6 @@ func stdev(deque *Deque, mean float64) float64 {
 }
 
 func printAlert(alertInfo AlertInfo, env *Env) {
-	//TODO: Test this file with smaller unit tests on each function, main function.
-	// TODO: practice 1-min and 3-min pitch.
-	// TODO: update poster with comments and submit for printing.
 	alertString := "ALERT!\n"
 	if alertInfo.NewNetwork {
 		alertString += "User just attempted connection from a new network.\n"
