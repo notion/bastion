@@ -90,7 +90,7 @@ func Serve(addr string, env *config.Env) {
 			apiGroup.GET("/sessions/:id", sessionID(env))
 
 			apiGroup.POST("/otp", checkOtp(env))
-			apiGroup.GET("/setupotp", setupotp(env))
+			apiGroup.GET("/setupotp", setupOtp(env))
 		}
 	}
 

@@ -29,10 +29,23 @@ type Env struct {
 	Yellow           *ColorLog
 	Blue             *ColorLog
 	Magenta          *ColorLog
+	AlertChannel     chan AlertInfo
 	SSHPort          string
 	SSHProxyPort     string
 	HTTPPort         string
 	MonPort          string
+}
+
+//used for email alerts on new logins, unsuccessful logins, and auths that occur after a long period of inactivity.
+type AlertInfo struct {
+	User       string
+	IP         net.IP
+	Timestamp  time.Time
+	LoginType  string
+	Success    bool
+	FirstLogin bool
+	NewNetwork bool
+	BeenAWhile bool
 }
 
 // WsClient is a struct that contains a websockets underlying data object

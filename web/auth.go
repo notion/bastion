@@ -37,7 +37,6 @@ func authMiddleware(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		path := strings.TrimSpace(c.Request.URL.Path)
 		session := sessions.Default(c)
-
 		auth := session.Get("loggedin")
 		otpAuth := session.Get("otpauthed")
 		if otpAuth != nil {
@@ -117,7 +116,7 @@ func checkOtp(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func setupotp(env *config.Env) func(c *gin.Context) {
+func setupOtp(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		sessionUser := session.Get("user").(*config.User)
