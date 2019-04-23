@@ -10,9 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/notion/bastion/proxyprotocol"
-	// "github.com/notion/bastion/alertsystem"
 	"github.com/notion/bastion/config"
+	"github.com/notion/bastion/proxyprotocol"
 	"golang.org/x/crypto/ssh"
 )
 

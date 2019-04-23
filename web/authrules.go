@@ -7,7 +7,7 @@ import (
 	"github.com/notion/bastion/config"
 )
 
-func AuthRule(env *config.Env) func(c *gin.Context) {
+func authRule(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		retData := make(map[string]interface{})
 		var authRules []config.AuthRules
@@ -42,7 +42,7 @@ func createAuthRule(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func DeleteAuthRule(env *config.Env) func(c *gin.Context) {
+func deleteAuthRule(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id, _ := c.Params.Get("id")
 		var authRule config.AuthRules
@@ -54,7 +54,7 @@ func DeleteAuthRule(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func UpdateAuthRule(env *config.Env) func(c *gin.Context) {
+func updateAuthRule(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		id, _ := c.Params.Get("id")
 

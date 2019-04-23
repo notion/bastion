@@ -156,7 +156,7 @@ func indexIAP(env *config.Env, conf oauth2.Config) func(c *gin.Context) {
 	}
 }
 
-func Logout(env *config.Env) func(c *gin.Context) {
+func logout(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 

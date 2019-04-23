@@ -64,33 +64,33 @@ func Serve(addr string, env *config.Env) {
 
 		apiGroup := authedGroup.Group("/api")
 		{
-			apiGroup.GET("/livesessions", LiveSession(env))
+			apiGroup.GET("/livesessions", liveSession(env))
 			userGroup := apiGroup.Group("/users")
 			{
-				userGroup.GET("", User(env))
-				userGroup.POST("/:id", UpdateUser(env))
-				userGroup.GET("/:id/keys", DownloadKey(env))
+				userGroup.GET("", user(env))
+				userGroup.POST("/:id", updateUser(env))
+				userGroup.GET("/:id/keys", downloadKey(env))
 			}
 
 			authRulesGroup := apiGroup.Group("/authrules")
 			{
-				authRulesGroup.GET("", AuthRule(env))
-				authRulesGroup.POST("/:id", UpdateAuthRule(env))
-				authRulesGroup.GET("/:id/delete", DeleteAuthRule(env))
+				authRulesGroup.GET("", authRule(env))
+				authRulesGroup.POST("/:id", updateAuthRule(env))
+				authRulesGroup.GET("/:id/delete", deleteAuthRule(env))
 			}
 
 			wsGroup := apiGroup.Group("/ws")
 			{
-				wsGroup.GET("/livesessions/:id", LiveSessionWS(env))
-				wsGroup.GET("/livesessions/:id/:sid", LiveSessionWS(env))
+				wsGroup.GET("/livesessions/:id", liveSessionWS(env))
+				wsGroup.GET("/livesessions/:id/:sid", liveSessionWS(env))
 			}
-			apiGroup.GET("/disconnect/:id", DisconnectLiveSession(env))
-			apiGroup.GET("/disconnect/:id/:sid", DisconnectLiveSession(env))
+			apiGroup.GET("/disconnect/:id", disconnectLiveSession(env))
+			apiGroup.GET("/disconnect/:id/:sid", disconnectLiveSession(env))
 			apiGroup.GET("/sessions", session(env))
-			apiGroup.GET("/sessions/:id", SessionID(env))
+			apiGroup.GET("/sessions/:id", sessionID(env))
 
-			apiGroup.POST("/otp", CheckOtp(env))
-			apiGroup.GET("/setupotp", SetupOtp(env))
+			apiGroup.POST("/otp", checkOtp(env))
+			apiGroup.GET("/setupotp", setupOtp(env))
 		}
 	}
 

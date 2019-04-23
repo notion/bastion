@@ -1,11 +1,11 @@
 cookiesecret: s0secure
 dbinfo:
   host: localhost
-  name: JennaSchwartz
-  pass: JennasPassword
+  name: example
+  pass: example
   port: 3306
   sqlite: true
-  user: jenna
+  user: example
 debug:
   db:
     enabled: true
@@ -35,12 +35,12 @@ multihost:
   hostname: ""
   ip: ""
 oauthcredentials:
-  clientid: 410608294662-ohk6vtn9hn97f3jm1au2kdecd3m57t9u.apps.googleusercontent.com
-  clientsecret: 3X72QfdjjXwFmHCalTlLvtbt
+  clientid: 0000000000000-foobar.apps.googleusercontent.com
+  clientsecret: foobar
   endpoint:
     authurl: https://accounts.google.com/o/oauth2/auth
     tokenurl: https://accounts.google.com/o/oauth2/token
-  redirecturl: http://localhost:8080
+  redirecturl: https://auth.example.com
   scopes:
   - https://www.googleapis.com/auth/userinfo.email
 otp:
