@@ -11,6 +11,7 @@ import (
 	mathrand "math/rand"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/notion/bastion/config"
@@ -223,4 +224,19 @@ func GetRegexMatches(user *config.User) []string {
 	}
 
 	return matchers
+}
+
+// WaitTimeout waits for a waitgroup
+func WaitTimeout(group *sync.WaitGroup, timeout time.Duration) bool {
+	stop := make(chan struct{})
+	go func() {
+		defer close(stop)
+		group.Wait()
+	}()
+	select {
+	case <-stop:
+		return false
+	case <-time.After(timeout):
+		return true
+	}
 }

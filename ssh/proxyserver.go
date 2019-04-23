@@ -5,11 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
-	"os/signal"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/notion/bastion/config"
@@ -31,35 +28,9 @@ func startProxyServer(addr string, env *config.Env) {
 
 	defer listener.Close()
 
-	mutex := &sync.Mutex{}
-
-	mutex.Lock()
-	stopped := false
-	mutex.Unlock()
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, os.Kill)
-	go func() {
-		for range c {
-			listener.Close()
-
-			mutex.Lock()
-			stopped = true
-			mutex.Unlock()
-
-			return
-		}
-	}()
-
 	env.Green.Println("Running SSH proxy server at:", addr)
 
-	isStopped := func() bool {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return !stopped
-	}
-
-	for isStopped() {
+	for {
 		tcpConn, err := listener.Accept()
 		if err != nil {
 			env.Red.Printf("Failed to accept incoming connection (%s)", err)
@@ -134,7 +105,13 @@ func getSSHProxyConfig(env *config.Env) *ssh.ServerConfig {
 					return nil, nil
 				}
 
-				client := ssh.NewClient(proxyConn, make(chan ssh.NewChannel, 0), make(chan *ssh.Request, 0))
+				fakeChan := make(chan ssh.NewChannel, 0)
+				fakeReqs := make(chan *ssh.Request, 0)
+
+				client := ssh.NewClient(proxyConn, fakeChan, fakeReqs)
+
+				close(fakeChan)
+				close(fakeReqs)
 
 				session, _ := client.NewSession()
 				defer session.Close()

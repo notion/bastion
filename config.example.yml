@@ -9,6 +9,9 @@ dbinfo:
 debug:
   db:
     enabled: true
+  info:
+    enabled: false
+    gostacktrace: true
   ssh:
     enabled: true
   web:

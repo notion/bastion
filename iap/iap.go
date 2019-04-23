@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -70,11 +71,19 @@ func (i *IAP) Verify(assertion string) (bool, jwt.MapClaims, error) {
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 			if claims.VerifyAudience(i.Audience, true) && claims.VerifyIssuer(i.Issuer, true) {
-				if hd, ok := claims["hd"].(string); ok {
-					for _, v := range i.HostedDomains {
-						if v == hd || v == "any" {
-							return true, claims, nil
-						}
+				var hd string
+				if email, ok := claims["email"].(string); ok {
+					emailComponents := strings.Split(email, "@")
+					hd = emailComponents[1]
+				}
+
+				if realHD, ok := claims["hd"].(string); ok {
+					hd = realHD
+				}
+
+				for _, v := range i.HostedDomains {
+					if v == hd || v == "any" {
+						return true, claims, nil
 					}
 				}
 			}

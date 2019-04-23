@@ -44,7 +44,7 @@ func AuthRuleTempl(env *config.Env) func(c *gin.Context) {
 	}
 }
 
-func NoaccessTempl(env *config.Env) func(c *gin.Context) {
+func authTempl(env *config.Env) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		session := sessions.Default(c)
 		userData := session.Get("user").(*config.User)
@@ -57,7 +57,7 @@ func NoaccessTempl(env *config.Env) func(c *gin.Context) {
 			return
 		}
 
-		c.HTML(http.StatusOK, "noaccess", userData)
+		c.HTML(http.StatusOK, "index", userData)
 	}
 }
 

@@ -113,7 +113,9 @@ func Load(forceCerts bool, webAddr string, sshAddr string, sshProxyAddr string, 
 	}
 
 	Alert(alertChan, env)
-	env.Blue.Printf("started configuration")
+	if vconfig.GetBool("debug.info.enabled") {
+		printDebugInfo(env)
+	}
 
 	if vconfig.GetBool("multihost.enabled") {
 		db.Delete(LiveSession{}, "bastion = ?", GetOutboundIP(env).String()+env.HTTPPort)

@@ -53,14 +53,14 @@ func Serve(addr string, env *config.Env) {
 	authedGroup := r.Group("/", authMiddleware(env))
 	{
 		authedGroup.GET("", index(env, oauthConfig))
-		authedGroup.GET("/logout", Logout(env))
-		authedGroup.GET("/sessions", SessionTempl(env))
-		authedGroup.GET("/livesessions", LiveSessionTempl(env))
-		authedGroup.GET("/users", UserTempl(env))
-		authedGroup.GET("/authrules", AuthRuleTempl(env))
-		authedGroup.GET("/noaccess", NoaccessTempl(env))
-		authedGroup.GET("/otp", OtpTempl(env))
-		authedGroup.GET("/setupotp", SetupOtpTempl(env))
+		authedGroup.GET("/logout", logout(env))
+		authedGroup.GET("/sessions", sessionTempl(env))
+		authedGroup.GET("/livesessions", liveSessionTempl(env))
+		authedGroup.GET("/users", userTempl(env))
+		authedGroup.GET("/authrules", authRuleTempl(env))
+		authedGroup.GET("/authenticated", authTempl(env))
+		authedGroup.GET("/otp", otpTempl(env))
+		authedGroup.GET("/setupotp", setupOtpTempl(env))
 
 		apiGroup := authedGroup.Group("/api")
 		{
